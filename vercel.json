@@ -1,0 +1,8 @@
+{
+  "routes": [
+    { "src": "/zh-hk/(.*)", "dest": "/shop-hk.html" },
+    { "src": "/zh-tw/(.*)", "dest": "/shop-tw.html" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
