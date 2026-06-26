@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>現場快閃代購 — 852hk.81jp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Noto+Sans+HK:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Noto Sans HK', sans-serif; background: #f7f6f3; color: #1a1a1a; -webkit-font-smoothing: antialiased; }
+    .jp-card { background: #fff; border: 1px solid #e8e6e1; border-radius: 10px; transition: all 0.2s; }
+    .jp-input { border: 1px solid #dcdfdc; background: #fafbfa; border-radius: 6px; transition: all 0.2s; }
+    .jp-input:focus { border-color: #8fa499; background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(143,164,153,0.15); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
+    .spinner { border: 2px solid rgba(0,0,0,0.1); width: 22px; height: 22px; border-radius: 50%; border-left-color: #4a574d; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand-serif { font-family: 'Shippori Mincho', serif; }
+    .closed-overlay { position: absolute; inset: 0; background: rgba(255,255,255,0.7); border-radius: 10px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    .deadline-banner { background: #fce4ec; border: 1px solid #ef9a9a; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #c62828; text-align: center; margin-bottom: 16px; }
+    .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(247,246,243,0.92); backdrop-filter: blur(12px); border-bottom: 1px solid #e8e6e1; height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; }
+    .hamburger { width: 38px; height: 38px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; border-radius: 8px; }
+    .hamburger span { display: block; width: 20px; height: 1.5px; background: #1a1a1a; border-radius: 2px; transition: all 0.3s; transform-origin: center; }
+    .hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+    .drawer-overlay { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,0.3); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+    .drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 95; width: 280px; background: #fff; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.4,0,0.2,1); border-left: 1px solid #e8e6e1; display: flex; flex-direction: column; }
+    .drawer.open { transform: translateX(0); }
+    .drawer-item { display: flex; align-items: center; justify-content: space-between; padding: 13px 20px; border-bottom: 1px solid #f0efec; text-decoration: none; color: #1a1a1a; font-size: 13px; font-weight: 500; transition: background 0.15s; }
+    .drawer-item:hover { background: #f7f6f3; }
+    .drawer-item.active { color: #c0392b; }
+    .region-switch { display: flex; gap: 0; background: #f0efec; border-radius: 6px; padding: 3px; }
+    .rs-btn { flex: 1; padding: 6px 0; font-size: 11px; border: none; background: none; cursor: pointer; border-radius: 4px; color: #888; font-weight: 500; letter-spacing: 0.5px; transition: all 0.2s; }
+    .rs-btn.active { background: #fff; color: #1a1a1a; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .countdown-wrap {
+      text-align: center; margin: 12px 0 16px;
+      padding: 12px 16px; background: #f7f6f3;
+      border: 1px solid var(--border-color, #e5e5e5);
+      border-radius: 10px;
+    }
+    .countdown-label { font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+    .countdown-timer { display: flex; justify-content: center; align-items: center; gap: 6px; }
+    .countdown-block { text-align: center; min-width: 44px; }
+    .countdown-num { font-family: 'Shippori Mincho', serif; font-size: 28px; font-weight: 600; color: #111; line-height: 1; }
+    .countdown-unit { font-size: 10px; color: #aaa; margin-top: 3px; letter-spacing: 1px; }
+    .countdown-sep { font-size: 22px; color: #ccc; font-weight: 300; margin-bottom: 8px; }
+    .countdown-wrap.urgent .countdown-num { color: #c0392b; }
+    .countdown-wrap.urgent { background: #fff5f5; border-color: #fca5a5; }
+    .countdown-expired { font-size: 13px; color: #c0392b; font-weight: 600; }
+    .email-typo-warn {
+      font-size: 11px; color: #d97706; font-weight: 600;
+      margin-top: 4px; padding: 4px 8px;
+      background: #fffbeb; border: 1px solid #fde68a;
+      border-radius: 5px; display: flex; align-items: center; gap: 6px;
+    }
+    .email-typo-fix { cursor: pointer; color: #0284c7; text-decoration: underline; font-weight: 700; }
+  </style>
+</head>
+<body class="min-h-screen pb-64" x-data="shopApp()" x-init="init()">
+
+<!-- Topbar -->
+<div class="topbar">
+  <a href="/" style="font-family:'Shippori Mincho',serif; font-size:16px; font-weight:600; letter-spacing:3px; color:#1a1a1a; text-decoration:none;">852hk.81jp</a>
+  <button class="hamburger" id="hamBtn"><span></span><span></span><span></span></button>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<!-- Drawer -->
+<div class="drawer" id="drawer">
+  <div style="padding:20px 20px 12px; border-bottom:1px solid #e8e6e1;">
+    <div style="font-size:10px; letter-spacing:3px; color:#888; text-transform:uppercase; margin-bottom:12px;">切換地區</div>
+    <div class="region-switch">
+      <button class="rs-btn active" onclick="window.location.href='/'">🇭🇰 HK</button>
+      <button class="rs-btn" onclick="switchToTW()">🇹🇼 TW</button>
+    </div>
+  </div>
+  <div style="padding:12px 20px 4px; font-size:10px; letter-spacing:2px; color:#aaa; text-transform:uppercase;">選擇活動</div>
+  <div id="drawerEvents" style="flex:1; overflow-y:auto;"></div>
+</div>
+
+<div class="max-w-6xl mx-auto px-4" style="padding-top: 68px;">
+
+  <!-- Event title -->
+  <header class="text-center my-6 max-w-md mx-auto">
+    <div style="font-size:10px; letter-spacing:3px; color:#c0392b; text-transform:uppercase; margin-bottom:6px;">香港版 · HKD</div>
+    <h1 class="brand-serif text-xl font-semibold tracking-widest" x-text="displayEventName || '載入中...'"></h1>
+    <div style="width:36px; height:1px; background:#bbb; margin:12px auto 0;"></div>
+  </header>
+
+  <!-- Deadline banner -->
+  <template x-if="isClosed">
+    <div class="deadline-banner">⚠️ 此活動已截止收單，感謝您的支持！</div>
+  </template>
+
+  <!-- 倒數計時（未截止才顯示）-->
+  <template x-if="!isClosed && deadline && countdownText !== null">
+    <div class="countdown-wrap max-w-md mx-auto" :class="{ urgent: countdownUrgent }">
+      <div class="countdown-label">收單倒數</div>
+      <template x-if="countdownText === 'expired'">
+        <div class="countdown-expired">已截止收單</div>
+      </template>
+      <template x-if="countdownText !== 'expired'">
+        <div class="countdown-timer">
+          <div class="countdown-block">
+            <div class="countdown-num" x-text="countdownD"></div>
+            <div class="countdown-unit">天</div>
+          </div>
+          <div class="countdown-sep">:</div>
+          <div class="countdown-block">
+            <div class="countdown-num" x-text="countdownH"></div>
+            <div class="countdown-unit">時</div>
+          </div>
+          <div class="countdown-sep">:</div>
+          <div class="countdown-block">
+            <div class="countdown-num" x-text="countdownM"></div>
+            <div class="countdown-unit">分</div>
+          </div>
+          <div class="countdown-sep">:</div>
+          <div class="countdown-block">
+            <div class="countdown-num" x-text="countdownS"></div>
+            <div class="countdown-unit">秒</div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- Loading -->
+  <template x-if="loading">
+    <div class="flex flex-col items-center justify-center py-20">
+      <div class="spinner mb-4"></div>
+      <p class="text-sm" style="color:#888;">正在載入商品...</p>
+    </div>
+  </template>
+
+  <template x-if="!loading">
+    <div>
+      <!-- Products grid -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <template x-for="product in products" :key="product.id">
+          <div class="jp-card p-2.5 flex flex-col relative"
+               :class="isProductSelected(product.id) ? 'border-neutral-700 ring-1 ring-neutral-700' : ''">
+
+            <!-- Closed overlay -->
+            <template x-if="isClosed">
+              <div class="closed-overlay"><span style="font-size:11px;color:#c62828;font-weight:600;">已截止</span></div>
+            </template>
+
+            <div class="w-full aspect-square bg-neutral-50 rounded mb-2 overflow-hidden">
+              <img :src="product.photo" class="w-full h-full object-cover" alt="">
+            </div>
+            <div class="flex-1 flex flex-col justify-between">
+              <div>
+                <h3 class="text-xs font-medium line-clamp-2 leading-tight" x-text="product.name"></h3>
+                <p class="text-xs font-bold mt-1">HK$ <span x-text="product.price"></span></p>
+                <p class="text-[10px] mt-0.5" style="color:#aaa;" x-text="product.yen ? '¥' + product.yen : ''"></p>
+              </div>
+              <div class="mt-2 pt-2 border-t border-dashed border-neutral-100">
+                <p class="text-[10px] mb-1" style="color:#aaa;">款式選擇（可複選）</p>
+                <div class="space-y-1 max-h-24 overflow-y-auto">
+                  <template x-for="sub in product.subs" :key="sub">
+                    <div class="flex items-center justify-between bg-neutral-50 p-1 rounded text-[11px]"
+                         :style="isSoldOut(product, sub) ? 'background:#fff0f0;' : ''">
+                      <label class="flex items-center space-x-1 flex-1 cursor-pointer truncate"
+                             :class="(isClosed || isSoldOut(product, sub)) ? 'opacity-50 pointer-events-none' : ''">
+                        <input type="checkbox"
+                               :checked="isSubChecked(product.id, sub)"
+                               @change="!isClosed && !isSoldOut(product, sub) && toggleSub(product, sub)"
+                               :disabled="isClosed || isSoldOut(product, sub)"
+                               class="w-3 h-3">
+                        <span class="truncate" style="color:#555;" x-text="sub"></span>
+                      </label>
+                      <!-- Sold Out 標籤 -->
+                      <template x-if="isSoldOut(product, sub)">
+                        <span style="font-size:9px; color:#c62828; font-weight:700; background:#fce4ec; padding:1px 5px; border-radius:3px; white-space:nowrap;">SOLD OUT</span>
+                      </template>
+                      <!-- 剩餘數量提示（剩1-3件時顯示） -->
+                      <template x-if="!isSoldOut(product, sub) && remaining(product, sub) !== null && remaining(product, sub) <= 3 && remaining(product, sub) > 0">
+                        <span style="font-size:9px; color:#e67e22; font-weight:600; white-space:nowrap;" x-text="'僅剩'+remaining(product, sub)+'件'"></span>
+                      </template>
+                      <!-- 數量加減器 -->
+                      <template x-if="isSubChecked(product.id, sub) && !isSoldOut(product, sub)">
+                        <div class="flex items-center space-x-1 ml-1 bg-white border border-neutral-200 rounded">
+                          <button @click="changeQty(product.id, sub, -1)" class="px-1 text-neutral-500 font-bold">-</button>
+                          <span class="text-[10px] w-3 text-center" x-text="getQty(product.id, sub)"></span>
+                          <button @click="changeQty(product.id, sub, 1)" class="px-1 text-neutral-500 font-bold">+</button>
+                        </div>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Recipient form -->
+      <div id="recipient-section" class="jp-card p-4 space-y-4 mb-6 scroll-mt-4 max-w-2xl">
+        <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#1a1a1a;">收件人資料</h2>
+        <div>
+          <label class="block text-xs mb-1" style="color:#888;">收件人姓名 *</label>
+          <input type="text" x-model="form.name" placeholder="請輸入姓名" class="w-full jp-input px-3 py-2 text-sm" :disabled="isClosed">
+        </div>
+        <div>
+          <label class="block text-xs mb-1" style="color:#888;">聯絡電話 *</label>
+          <input type="tel" inputmode="numeric" x-model="form.phone"
+                 @input="form.phone = form.phone.replace(/\D/g,'').substring(0,8)"
+                 placeholder="請輸入8位香港手機號碼" class="w-full jp-input px-3 py-2 text-sm" :disabled="isClosed">
+        </div>
+        <div>
+          <label class="block text-xs mb-1" style="color:#888;">電子郵件 *</label>
+          <input type="email" x-model="form.email"
+                 placeholder="請輸入電郵地址"
+                 class="w-full jp-input px-3 py-2 text-sm"
+                 :disabled="isClosed"
+                 @input="checkEmailTypo()">
+          <div x-show="emailTypoWarn" class="email-typo-warn">
+            ⚠️ 係咪打錯？建議改為
+            <span class="email-typo-fix" @click="applyEmailFix()">
+              <span x-text="emailTypoSuggestion"></span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 易寄取 -->
+      <div class="jp-card p-4 space-y-4 mb-6 max-w-2xl">
+        <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#1a1a1a;">易寄取收件地址</h2>
+        <div>
+          <label class="block text-xs mb-1" style="color:#888;">搜尋門市（可輸入編號或名稱）</label>
+          <input type="text" x-model="addressSearch" placeholder="例如：7-Eleven / 旺角 / HK001" class="w-full jp-input px-3 py-2 text-sm">
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] mb-1" style="color:#aaa;">類別</label>
+            <select x-model="filter.type" @change="resetAddressCascade('type')" class="w-full jp-input p-1.5 text-xs bg-white">
+              <option value="">全部</option>
+              <option>郵政局</option><option>智郵站</option><option>7-Eleven</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] mb-1" style="color:#aaa;">地區</label>
+            <select x-model="filter.region" @change="resetAddressCascade('region')" class="w-full jp-input p-1.5 text-xs bg-white">
+              <option value="">全部</option>
+              <template x-for="r in availableRegions" :key="r"><option :value="r" x-text="r"></option></template>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] mb-1" style="color:#aaa;">分區</label>
+            <select x-model="filter.district" @change="resetAddressCascade('district')" class="w-full jp-input p-1.5 text-xs bg-white">
+              <option value="">全部</option>
+              <template x-for="d in availableDistricts" :key="d"><option :value="d" x-text="d"></option></template>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs mb-1" style="color:#888;">選擇自提點 *</label>
+          <select x-model="selectedAddressIndex" class="w-full jp-input p-2 text-xs bg-white">
+            <option value="">— 請選擇收件地址 —</option>
+            <template x-for="(addr, idx) in filteredAddresses" :key="idx">
+              <option :value="addr.originalIndex" x-text="`[${addr.code}] ${addr.name} - ${addr.address}`"></option>
+            </template>
+          </select>
+        </div>
+        <div style="background:#f7f6f3; border:1px solid #e8e6e1;" class="p-3 rounded text-xs space-y-1">
+          <p class="font-medium" style="color:#1a1a1a;">已選收件地址：</p>
+          <p style="color:#666;">地區：<strong x-text="displayAddress.region || '（未選擇）'"></strong></p>
+          <p style="color:#666;">分區：<strong x-text="displayAddress.district || '（未選擇）'"></strong></p>
+          <p style="color:#666;">地址：<strong x-text="displayAddress.address || '（未選擇）'"></strong></p>
+        </div>
+      </div>
+
+      <!-- Payment -->
+      <div class="jp-card p-4 space-y-3 mb-6 max-w-2xl">
+        <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#1a1a1a;">付款方式</h2>
+        <div class="flex space-x-6 px-2">
+          <label class="flex items-center space-x-2 text-sm cursor-pointer">
+            <input type="radio" name="payment" value="PayMe" x-model="form.paymentMethod"> <span>PayMe</span>
+          </label>
+          <label class="flex items-center space-x-2 text-sm cursor-pointer">
+            <input type="radio" name="payment" value="FPS" x-model="form.paymentMethod"> <span>轉數快 (FPS)</span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+  </template>
+</div>
+
+<!-- Footer cart -->
+<footer class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-50" style="border-color:#e8e6e1;">
+  <div class="max-w-md mx-auto relative h-0">
+    <div class="absolute -top-14 right-4 z-50">
+      <button @click="scrollToRecipient()"
+              class="p-3 rounded-full shadow-lg flex items-center justify-center text-white relative"
+              style="background:#1a1a1a;">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 0a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        <template x-if="cartItems.length > 0">
+          <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse"
+                x-text="cartItems.reduce((s,i)=>s+i.qty,0)"></span>
+        </template>
+      </button>
+    </div>
+  </div>
+  <div class="max-w-md mx-auto p-4">
+    <div class="mb-3 text-xs max-h-20 overflow-y-auto border rounded bg-neutral-50 p-2" style="border-color:#e8e6e1;">
+      <p class="font-medium mb-1" style="color:#555;">已選商品明細：</p>
+      <template x-for="item in cartItems" :key="item.id+'-'+item.sub">
+        <div class="flex justify-between py-0.5 border-b border-dashed last:border-0" style="color:#888; border-color:#e0e0e0;">
+          <span class="truncate max-w-[240px]" x-text="`${item.name}${item.sub ? ' {'+item.sub+'}' : ''} [x${item.qty}]`"></span>
+          <span class="font-medium" style="color:#333;" x-text="`HK$${item.price*item.qty}`"></span>
+        </div>
+      </template>
+      <template x-if="cartItems.length===0">
+        <p style="color:#bbb;" class="italic">請勾選想購買的商品款式</p>
+      </template>
+    </div>
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-[10px]" style="color:#aaa;">小計 HK$<span x-text="subtotal"></span> ｜ 郵費 <span x-text="shippingFee===0?'包郵':'HK$'+shippingFee"></span></p>
+        <p class="text-lg font-bold">總金額 HK$<span x-text="totalAmount"></span></p>
+      </div>
+      <button @click="submitOrder()"
+              :disabled="submitting || cartItems.length===0 || isClosed"
+              class="text-white text-sm font-medium py-2.5 px-5 rounded-md tracking-widest transition disabled:cursor-not-allowed flex items-center space-x-2"
+              :style="isClosed ? 'background:#ccc;' : 'background:#1a1a1a;'">
+        <template x-if="submitting"><div class="spinner !w-4 !h-4 mr-2"></div></template>
+        <span x-text="isClosed ? '已截止收單' : (submitting ? '提交中...' : '確認提交訂單')"></span>
+      </button>
+    </div>
+  </div>
+</footer>
+
+<script>
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
+
+// ── Supabase Client ──────────────────────────────────────────
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
+
+async function sbGet(path) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: SUPA_HEADERS });
+  return res.ok ? res.json() : [];
+}
+
+// 將 Supabase products/subs 轉為前台格式
+function buildProducts(prodData, subData) {
+  return prodData.map(p => {
+    const subs = subData.filter(s => s.product_name === p.name);
+    const hasSubs = subs.some(s => s.sub_name !== '');
+    const limits = {};
+    subs.forEach(s => {
+      if (s.stock_limit > 0) limits[s.sub_name === '' ? '__all__' : s.sub_name] = s.stock_limit;
+    });
+    return {
+      name: p.name,
+      imageUrl: p.image_url,
+      yenPrice: p.yen_price,
+      hkdPrice: p.hkd_price,
+      twdPrice: p.twd_price,
+      weight: p.weight_g,
+      subs: hasSubs ? subs.map(s => s.sub_name) : [],
+      subImages: Object.fromEntries(subs.map(s => [s.sub_name, s.image_url || ''])),
+      subStockLimit: Object.keys(limits).length ? limits : null
+    };
+  });
+}
+
+function buildOrderedQty(qtyData) {
+  const out = {};
+  qtyData.forEach(q => { out[q.product_name + '|' + q.sub_name] = q.qty_ordered; });
+  return out;
+}
+// ─────────────────────────────────────────────────────────────
+const EXCLUDED = ["Blank","易寄取地址","訂單紀錄","收單截止時間","購貨紀錄","盈利紀錄"];
+
+// Drawer
+const hamBtn = document.getElementById('hamBtn');
+const drawer = document.getElementById('drawer');
+const drawerOverlay = document.getElementById('drawerOverlay');
+hamBtn.addEventListener('click', () => { drawer.classList.toggle('open'); drawerOverlay.classList.toggle('open'); hamBtn.classList.toggle('open'); });
+drawerOverlay.addEventListener('click', () => { drawer.classList.remove('open'); drawerOverlay.classList.remove('open'); hamBtn.classList.remove('open'); });
+
+function switchToTW() {
+  const path = window.location.pathname.replace('/zh-hk/', '/zh-tw/');
+  window.location.href = path;
+}
+
+// Load drawer events
+async function loadDrawerEvents() {
+  try {
+    const events = await sbGet('events?is_ended=eq.false&is_active=eq.true&select=name,deadline&order=sort_order');
+    const container = document.getElementById('drawerEvents');
+    container.innerHTML = '';
+    const curEvent = new URLSearchParams(window.location.search).get('event') || '';
+    events.forEach(ev => {
+      const expired = ev.deadline ? new Date() > new Date(ev.deadline) : false;
+      const a = document.createElement('a');
+      a.className = 'drawer-item' + (ev.name === curEvent ? ' active' : '');
+      a.href = '/zh-hk/' + ev.name.replace(/\s+/g,'-') + '.html';
+      a.innerHTML = `<span>${ev.name}</span><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${expired?'#fce4ec':'#e8f5e9'};color:${expired?'#c62828':'#2e7d32'};font-weight:600;">${expired?'已截止':'進行中'}</span>`;
+      container.appendChild(a);
+    });
+  } catch(e) { console.error(e); }
+}
+loadDrawerEvents();
+
+function shopApp() {
+  return {
+    loading: true, submitting: false,
+    displayEventName: '', sheetEventName: '',
+    products: [], allAddresses: [],
+    addressSearch: '', selectedAddressIndex: '',
+    filter: { type:'', region:'', district:'' },
+    form: { name:'', phone:'', email:'', paymentMethod:'PayMe' },
+    cart: {},
+    deadline: '',
+    orderedQty: {},
+    emailTypoWarn: false,
+    emailTypoSuggestion: '',
+    countdownText: null,
+    countdownD: '00', countdownH: '00', countdownM: '00', countdownS: '00',
+    countdownUrgent: false,
+    _countdownTimer: null,
+
+    get isClosed() {
+      if (!this.deadline) return false;
+      const dl = new Date(this.deadline.replace(/\//g,'-'));
+      return !isNaN(dl) && new Date() > dl;
+    },
+
+    getEventNameFromURL() {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        let ep = urlParams.get('event');
+        if (ep) return decodeURIComponent(ep).trim();
+        const path = window.location.pathname;
+        let fileName = path.substring(path.lastIndexOf('/') + 1);
+        if (!fileName || fileName === 'index.html') return '';
+        return decodeURIComponent(fileName).replace(/\.html$/i,'').replace(/-/g,' ').trim();
+      } catch(e) { return ''; }
+    },
+
+    async init() {
+      this.sheetEventName = this.getEventNameFromURL();
+      this.displayEventName = this.sheetEventName;
+      if (!this.sheetEventName) { this.loading = false; return; }
+      document.title = `代購 ${this.displayEventName} (HK) — 852hk.81jp`;
+      try {
+        const evName = encodeURIComponent(this.sheetEventName);
+        const [prodData, subData, qtyData, addrData, evData] = await Promise.all([
+          sbGet(`products?event_name=eq.${evName}&select=*&order=sort_order`),
+          sbGet(`product_subs?event_name=eq.${evName}&select=*&order=sort_order`),
+          sbGet(`ordered_qty?event_name=eq.${evName}&select=product_name,sub_name,qty_ordered`),
+          sbGet('hk_addresses?select=*&order=sort_order'),
+          sbGet(`events?name=eq.${evName}&select=deadline,is_active`)
+        ]);
+        this.products     = buildProducts(prodData, subData);
+        this.allAddresses = addrData.map((item, i) => { item.originalIndex = i; return item; });
+        this.orderedQty   = buildOrderedQty(qtyData);
+        this.deadline     = evData[0]?.deadline ? new Date(evData[0].deadline).toLocaleString('zh-HK',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(/\//g,'/') : '';
+      } catch(e) { alert('讀取商品失敗，請重試。'); }
+      finally { this.loading = false; }
+      // 啟動倒數計時
+      if (this.deadline) this.startCountdown();
+      this.startAutoRefresh();
+    },
+
+    checkEmailTypo() {
+      const email = this.form.email.toLowerCase();
+      const typos = ['.con','.cmo','.ocm','.vom','.xom','.cpm',
+                     '.gmai.com','.gamil.com','.yaho.com','.outlok.com'];
+      const fixes  = ['.com','.com','.com','.com','.com','.com',
+                      '.gmail.com','.gmail.com','.yahoo.com','.outlook.com'];
+      for (let i = 0; i < typos.length; i++) {
+        if (email.endsWith(typos[i])) {
+          this.emailTypoSuggestion = this.form.email.slice(0, -typos[i].length) + fixes[i];
+          this.emailTypoWarn = true;
+          return;
+        }
+      }
+      this.emailTypoWarn = false;
+      this.emailTypoSuggestion = '';
+    },
+
+    applyEmailFix() {
+      this.form.email = this.emailTypoSuggestion;
+      this.emailTypoWarn = false;
+      this.emailTypoSuggestion = '';
+    },
+
+    startAutoRefresh() {
+      // 每 60 秒靜默重新拉取庫存狀態（不影響表單和購物車）
+      setInterval(async () => {
+        if (!this.sheetEventName || this.submitting) return;
+        try {
+          const evName = encodeURIComponent(this.sheetEventName);
+          const qtyData = await sbGet(`ordered_qty?event_name=eq.${evName}&select=product_name,sub_name,qty_ordered`);
+          this.orderedQty = buildOrderedQty(qtyData);
+        } catch(e) { /* 靜默失敗，不打擾客人 */ }
+      }, 60000);
+    },
+
+    startCountdown() {
+      const tick = () => {
+        if (!this.deadline) return;
+        const dl = new Date(this.deadline.replace(/\//g, '-'));
+        const now = new Date();
+        const diff = dl - now;
+        if (diff <= 0) {
+          this.countdownD = '00'; this.countdownH = '00';
+          this.countdownM = '00'; this.countdownS = '00';
+          this.countdownText = 'expired';
+          return;
+        }
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        this.countdownD = String(d).padStart(2, '0');
+        this.countdownH = String(h).padStart(2, '0');
+        this.countdownM = String(m).padStart(2, '0');
+        this.countdownS = String(s).padStart(2, '0');
+        this.countdownText = 'running';
+        this.countdownUrgent = diff < 24 * 3600000; // 24小時內變紅
+      };
+      tick();
+      this._countdownTimer = setInterval(tick, 1000);
+    },
+
+    // 某款式的已購數量
+    soldOutQty(productName, sub) {
+      const key = productName + '|' + sub;
+      return this.orderedQty[key] || 0;
+    },
+    isSoldOut(product, sub) {
+      const ssl = product.subStockLimit;
+      if (!ssl) return false;
+      const limit = ssl.hasOwnProperty(sub) ? ssl[sub]
+                  : ssl.hasOwnProperty('__all__') ? ssl['__all__'] : null;
+      if (limit === null || limit === undefined) return false;
+      return this.soldOutQty(product.name, sub) >= limit;
+    },
+    remaining(product, sub) {
+      const ssl = product.subStockLimit;
+      if (!ssl) return null;
+      const limit = ssl.hasOwnProperty(sub) ? ssl[sub]
+                  : ssl.hasOwnProperty('__all__') ? ssl['__all__'] : null;
+      if (limit === null || limit === undefined) return null;
+      return Math.max(0, limit - this.soldOutQty(product.name, sub));
+    },
+
+    scrollToRecipient() { document.getElementById('recipient-section')?.scrollIntoView({behavior:'smooth'}); },
+    isProductSelected(id) { return Object.keys(this.cart).some(k => k.startsWith(id+'_')); },
+    isSubChecked(id, sub) { return !!this.cart[id+'_'+sub]; },
+    toggleSub(product, sub) {
+      const key = product.id+'_'+sub;
+      if (this.cart[key]) { delete this.cart[key]; }
+      else {
+        if (this.isSoldOut(product, sub)) return; // 已售完，禁止勾選
+        this.cart[key] = {id:product.id, name:product.name, sub, price:product.price, yen:product.yen||0, qty:1};
+      }
+      this.cart = {...this.cart};
+    },
+    getQty(id, sub) { return this.cart[id+'_'+sub]?.qty || 0; },
+    changeQty(id, sub, amt) {
+      const key = id+'_'+sub;
+      if (!this.cart[key]) return;
+      this.cart[key].qty = Math.max(1, this.cart[key].qty + amt);
+      this.cart = {...this.cart};
+    },
+    get cartItems() { return Object.values(this.cart); },
+    get subtotal() { return this.cartItems.reduce((s,i) => s + i.price*i.qty, 0); },
+    get shippingFee() { return this.cartItems.length===0 ? 0 : (this.subtotal >= 500 ? 0 : 10); },
+    get totalAmount() { return this.subtotal + this.shippingFee; },
+    get availableRegions() { let s=new Set(); this.allAddresses.forEach(a => { if (!this.filter.type||a.type===this.filter.type) s.add(a.region); }); return Array.from(s); },
+    get availableDistricts() { let s=new Set(); this.allAddresses.forEach(a => { if ((!this.filter.type||a.type===this.filter.type)&&(!this.filter.region||a.region===this.filter.region)) s.add(a.district); }); return Array.from(s); },
+    get filteredAddresses() {
+      let search = this.addressSearch.trim().toLowerCase();
+      return this.allAddresses.filter(a => {
+        if (this.filter.type && a.type !== this.filter.type) return false;
+        if (this.filter.region && a.region !== this.filter.region) return false;
+        if (this.filter.district && a.district !== this.filter.district) return false;
+        if (search && !a.code.toLowerCase().includes(search) && !a.name.toLowerCase().includes(search) && !a.address.toLowerCase().includes(search)) return false;
+        return true;
+      });
+    },
+    resetAddressCascade(level) {
+      if (level==='type') { this.filter.region=''; this.filter.district=''; }
+      if (level==='region') this.filter.district='';
+      if (this.selectedAddressIndex !== '' && !this.filteredAddresses.some(a => a.originalIndex === Number(this.selectedAddressIndex))) this.selectedAddressIndex='';
+    },
+    get displayAddress() { return this.selectedAddressIndex==='' ? {} : (this.allAddresses[this.selectedAddressIndex]||{}); },
+
+    async submitOrder() {
+      if (this.isClosed) { alert('此活動已截止收單。'); return; }
+      this.checkEmailTypo();
+      if (this.emailTypoWarn) {
+        if (!confirm(`電郵地址可能有錯字（${this.form.email}），建議改為 ${this.emailTypoSuggestion}。\n確定要繼續使用原本的地址提交嗎？`)) return;
+      }
+      if (this.cart.length===0 || !this.form.name.trim() || !this.form.phone.trim() || !this.form.email.trim()) {
+        alert('請確認所有必填欄位（姓名、電話、電郵、收件地址）及已勾選商品。'); return;
+      }
+      this.submitting = true;
+      let totalJPYAmount = 0;
+      this.cartItems.forEach(item => {
+        // new format handled below
+        totalJPYAmount += (parseFloat(item.yen)||0) * item.qty;
+      });
+      const itemsSummary = this.cartItems.map(item => {
+        const subPart = item.sub ? ` {${item.sub}}` : '';
+        return `${item.name}${subPart} [x${item.qty}]`;
+      }).join(', ');
+      const payload = {
+        eventSheetName: this.sheetEventName, region: 'hk',
+        itemsSummary, totalAmount: this.totalAmount,
+        shippingFee: this.shippingFee, paymentMethod: this.form.paymentMethod,
+        totalJPYAmount, recipientName: this.form.name,
+        recipientPhone: this.form.phone, recipientEmail: this.form.email.trim(),
+        pickupType: this.displayAddress.type, pickupCode: this.displayAddress.code,
+        pickupName: this.displayAddress.name, pickupAddress: this.displayAddress.address,
+        cartItems: this.cartItems
+      };
+      try {
+        await fetch(GAS_API_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        alert(`🎉 訂單提交成功！\n\n應付總額：HK$${this.totalAmount}\n確認信已寄出，請於指定時間內完成付款。\n如遇缺貨，我哋會以收到付款嘅先後次序安排貨品。多謝！`);
+        this.cart={}; this.form.name=''; this.form.phone=''; this.form.email=''; this.selectedAddressIndex='';
+      } catch(e) { alert('提交失敗，請檢查網絡連線。'); }
+      finally { this.submitting=false; }
+    }
+  };
+}
+</script>
+<!-- Alpine.js 必須在 shopApp() 定義之後載入 -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</body>
+</html>
