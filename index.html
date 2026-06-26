@@ -1,524 +1,519 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="zh-HK">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>代購0601 popup Le Sserafim</title>
-    <!-- Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js for lightweight reactive state matching Japanese clean design -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Noto Sans HK', 'Helvetica Neue', Arial, sans-serif;
-            background-color: #fbfbfa;
-            color: #333333;
-        }
-        /* 日系洗鍊感微陰影與邊框 */
-        .jp-card {
-            background: #ffffff;
-            border: 1px solid #eef0ed;
-            border-radius: 8px;
-            transition: all 0.25s ease;
-        }
-        .jp-input {
-            border: 1px solid #dcdfdc;
-            background-color: #fafbfa;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-        .jp-input:focus {
-            border-color: #8fa499;
-            background-color: #ffffff;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(143, 164, 153, 0.15);
-        }
-        /* 精細捲動軸 */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #c5cbc5;
-            border-radius: 3px;
-        }
-        /* 載入動畫 */
-        .spinner {
-            border: 3px solid rgba(0, 0, 0, 0.1);
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border-left-color: #4a574d;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>852hk.81jp — 日本代購</title>
+  <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600&family=Noto+Sans+HK:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f7f6f3;
+      --card: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #888888;
+      --border: #e8e6e1;
+      --hk: #c0392b;
+      --tw: #2980b9;
+      --tag-open: #e8f5e9;
+      --tag-open-text: #2e7d32;
+      --tag-closed: #fce4ec;
+      --tag-closed-text: #c62828;
+      --mercari: #e85d04;
+      --general: #6d597a;
+    }
+
+    body {
+      font-family: 'Noto Sans HK', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(247,246,243,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+    }
+    .brand {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 17px; font-weight: 600; letter-spacing: 3px;
+      color: var(--ink); text-decoration: none;
+    }
+    .hamburger {
+      width: 40px; height: 40px; border: none; background: none; cursor: pointer;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
+      border-radius: 8px; transition: background 0.2s;
+    }
+    .hamburger:hover { background: var(--border); }
+    .hamburger span {
+      display: block; width: 22px; height: 1.5px;
+      background: var(--ink); border-radius: 2px;
+      transition: all 0.3s ease; transform-origin: center;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open span:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+    /* ── Drawer ── */
+    .drawer-overlay {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0,0,0,0.3); opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 95;
+      width: 300px; background: var(--card);
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+      border-left: 1px solid var(--border);
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-header { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); }
+    .drawer-title { font-size: 11px; letter-spacing: 3px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px; }
+    .region-toggle { display: flex; background: var(--bg); border-radius: 8px; padding: 3px; gap: 2px; }
+    .region-btn {
+      flex: 1; padding: 7px 0; font-size: 12px; font-weight: 500;
+      border: none; background: none; cursor: pointer;
+      border-radius: 6px; color: var(--muted); transition: all 0.2s; letter-spacing: 1px;
+    }
+    .region-btn.active { background: var(--card); box-shadow: 0 1px 4px rgba(0,0,0,0.1); color: var(--ink); }
+    .region-btn.hk.active { color: var(--hk); }
+    .region-btn.tw.active { color: var(--tw); }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 12px 0; }
+    .drawer-section-label { font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; padding: 8px 20px 4px; }
+    .drawer-event-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; text-decoration: none; color: var(--ink);
+      border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer;
+    }
+    .drawer-event-item:hover { background: var(--bg); }
+    .drawer-event-item:last-child { border-bottom: none; }
+    .dei-name { font-size: 13px; font-weight: 500; }
+    .dei-status { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+    .dei-status.open { background: var(--tag-open); color: var(--tag-open-text); }
+    .dei-status.closed { background: var(--tag-closed); color: var(--tag-closed-text); }
+
+    /* ── Main ── */
+    .main { max-width: 480px; margin: 0 auto; padding: 88px 20px 60px; }
+
+    .hero { text-align: center; margin-bottom: 48px; }
+    .hero-brand { font-family: 'Shippori Mincho', serif; font-size: 28px; font-weight: 600; letter-spacing: 6px; color: var(--ink); }
+    .hero-divider { width: 36px; height: 1px; background: var(--muted); margin: 12px auto; }
+    .hero-sub { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+
+    /* Region pill */
+    .region-pill-wrap { display: flex; justify-content: center; margin-bottom: 32px; }
+    .region-pill { display: flex; background: var(--card); border: 1px solid var(--border); border-radius: 40px; padding: 4px; }
+    .rpill-btn {
+      padding: 7px 22px; font-size: 12px; font-weight: 500;
+      border: none; background: none; cursor: pointer;
+      border-radius: 36px; color: var(--muted); transition: all 0.2s; letter-spacing: 0.5px;
+    }
+    .rpill-btn.active { color: var(--card); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .rpill-btn.hk.active { background: var(--hk); }
+    .rpill-btn.tw.active { background: var(--tw); }
+
+    /* Section header */
+    .section-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 16px; margin-top: 40px;
+    }
+    .section-header:first-of-type { margin-top: 0; }
+    .section-line { flex: 1; height: 1px; background: var(--border); }
+    .section-title { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap; }
+    .section-title.flash { color: var(--ink); }
+    .section-title.mercari { color: var(--mercari); }
+    .section-title.general { color: var(--general); }
+
+    /* Event cards */
+    .event-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+    .event-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 20px;
+      text-decoration: none; color: var(--ink);
+      display: flex; align-items: center; justify-content: space-between;
+      transition: all 0.25s ease; position: relative; overflow: hidden;
+    }
+    .event-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+    .event-card.hk::before { background: var(--hk); }
+    .event-card.tw::before { background: var(--tw); }
+    .event-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.07); }
+    .event-card.expired { opacity: 0.55; pointer-events: none; }
+    .ec-left { flex: 1; padding-left: 10px; }
+    .ec-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .ec-region { font-size: 10px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+    .ec-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .ec-badge { font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+    .ec-badge.open { background: var(--tag-open); color: var(--tag-open-text); }
+    .ec-badge.closed { background: var(--tag-closed); color: var(--tag-closed-text); }
+    .ec-arrow { font-size: 16px; color: #cccccc; }
+    .ec-countdown { font-size: 10px; color: #e67e22; }
+
+    /* Loading */
+    .loading-wrap { text-align: center; padding: 40px 0; color: var(--muted); font-size: 13px; }
+    .spinner { border: 2px solid rgba(0,0,0,0.08); width: 22px; height: 22px; border-radius: 50%; border-left-color: var(--ink); animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty-msg { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; line-height: 1.8; }
+
+    /* ── 靜態服務卡片（Mercari / 通常商品）── */
+    .service-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px;
+      position: relative; overflow: hidden;
+    }
+    .service-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+    .service-card.mercari::before { background: var(--mercari); }
+    .service-card.general::before { background: var(--general); }
+
+    .service-card-inner { padding-left: 10px; }
+    .service-points { list-style: none; margin-bottom: 14px; }
+    .service-points li {
+      font-size: 13px; color: #333; line-height: 1.8;
+      padding: 2px 0;
+    }
+    .service-rate {
+      font-size: 12px; color: var(--muted); line-height: 1.8;
+      background: var(--bg); border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 14px;
+    }
+    .service-rate strong { color: var(--ink); }
+    .service-contact { display: flex; flex-direction: column; gap: 6px; }
+    .service-contact-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+    .contact-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--ink); text-decoration: none;
+      padding: 7px 12px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 8px;
+      transition: all 0.2s; font-weight: 500;
+    }
+    .contact-link:hover { border-color: var(--ink); }
+
+    /* Region-sensitive: hide/show */
+    .hk-only { display: block; }
+    .tw-only { display: none; }
+    body.tw .hk-only { display: none; }
+    body.tw .tw-only { display: block; }
+
+    /* Coming soon placeholder */
+    .coming-soon {
+      text-align: center; padding: 28px 20px;
+      color: var(--muted); font-size: 13px; line-height: 1.8;
+      border: 1.5px dashed var(--border); border-radius: 12px;
+    }
+    .coming-soon .cs-icon { font-size: 24px; margin-bottom: 8px; }
+  </style>
 </head>
-<body class="antialiased min-h-screen pb-40">
+<body>
 
-    <!-- 頂部導航欄 -->
-    <div class="max-w-md mx-auto pt-4 px-4 flex justify-between items-center">
-        <a href="https://www.threads.net/@852hk.81jp" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1 text-xs text-neutral-500 hover:text-neutral-800 transition-colors">
-            <!-- Threads SVG Icon -->
-            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 24C5.385 24 0 18.615 0 12S5.385 0 12 0s12 5.385 12 12-5.385 12-12 12zm0-22c-5.514 0-10 4.486-10 10s4.486 10 10 10 10-4.486 10-10-4.486-10-10-10zm2.748 11.232c.112-.556.162-1.071.162-1.583 0-1.879-1.291-3.136-3.235-3.136-2.146 0-3.321 1.487-3.321 3.511 0 2.152 1.258 3.511 3.42 3.511 1.341 0 2.378-.504 2.87-1.391l1.328.775c-.752 1.353-2.32 2.146-4.198 2.146-3.111 0-4.992-1.954-4.992-5.041 0-2.983 1.832-5.041 4.903-5.041 2.81 0 4.73 1.777 4.73 4.659 0 .762-.075 1.52-.224 2.278l-1.444-.219zm-3.109-3.242c1.026 0 1.637.581 1.637 1.487 0 .092-.004.182-.012.271h-3.23c.068-.991.644-1.758 1.605-1.758z"/>
-            </svg>
-            <span class="font-medium tracking-wider">Threads</span>
+<!-- Top bar -->
+<div class="topbar">
+  <a href="/" class="brand">852hk.81jp</a>
+  <button class="hamburger" id="hamburgerBtn" aria-label="選單">
+    <span></span><span></span><span></span>
+  </button>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<!-- Drawer -->
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">選擇地區</div>
+    <div class="region-toggle">
+      <button class="region-btn hk active" data-region="hk">🇭🇰 香港</button>
+      <button class="region-btn tw" data-region="tw">🇹🇼 台灣</button>
+    </div>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-section-label">快閃代購活動</div>
+    <div id="drawerEventList">
+      <div style="padding:20px; color:#aaa; font-size:13px;">載入中...</div>
+    </div>
+    <div class="drawer-section-label" style="margin-top:8px;">其他服務</div>
+    <a class="drawer-event-item" href="#mercari" onclick="closeDrawer()">
+      <span class="dei-name">🇯🇵 Mercari 代購</span>
+    </a>
+    <a class="drawer-event-item" href="#general" onclick="closeDrawer()">
+      <span class="dei-name">🛍️ 通常商品代購</span>
+    </a>
+  </div>
+</div>
+
+<!-- Main -->
+<main class="main">
+  <div class="hero">
+    <div class="hero-brand">852hk.81jp</div>
+    <div class="hero-divider"></div>
+    <div class="hero-sub">日本代購服務</div>
+  </div>
+
+  <div class="region-pill-wrap">
+    <div class="region-pill">
+      <button class="rpill-btn hk active" data-region="hk">🇭🇰 香港版 HKD</button>
+      <button class="rpill-btn tw" data-region="tw">🇹🇼 台灣版 TWD</button>
+    </div>
+  </div>
+
+  <!-- ── Section 1: 現場快閃代購 ── -->
+  <div class="section-header">
+    <div class="section-line"></div>
+    <div class="section-title flash">⚡ 現場快閃代購</div>
+    <div class="section-line"></div>
+  </div>
+
+  <div id="loadingWrap" class="loading-wrap">
+    <div class="spinner"></div>
+    <div>正在獲取最新快閃活動...</div>
+  </div>
+  <div id="eventList" class="event-list" style="display:none;"></div>
+
+  <!-- ── Section 2: Mercari 代購 ── -->
+  <div class="section-header" id="mercari" style="scroll-margin-top: 72px;">
+    <div class="section-line"></div>
+    <div class="section-title mercari">🇯🇵 日本 Mercari 代購</div>
+    <div class="section-line"></div>
+  </div>
+
+  <!-- HK Mercari -->
+  <div class="service-card mercari hk-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✨ 每兩星期由日本寄出</li>
+        <li>✨ 無其他手續費</li>
+        <li>✨ 收到款項即買</li>
+        <li>✨ 到港後用 順豐到付 / 郵局易寄取 +$10至$13 / 平郵實報實銷 寄出</li>
+        <li>✨ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率</strong>以每團每位客人嘅總金額計算<br>
+        <strong>到港運費：</strong>HK$4.5／50g（50g起跳，超過50g以實重計算）
+      </div>
+      <div class="service-contact">
+        <div class="service-contact-label">👉🏻 歡迎帶 link 查詢報價</div>
+        <a class="contact-link" href="https://www.instagram.com/852hk.81jp?igsh=anhqNzQ1dGhlaWs4&utm_source=qr" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          @852hk.81jp
         </a>
-        <div></div>
+        <a class="contact-link" href="https://wa.me/85293375712" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          WhatsApp
+        </a>
+      </div>
     </div>
+  </div>
 
-    <div x-data="shopApp()" x-init="init()" class="max-w-md mx-auto px-4 py-2">
-        
-        <!-- 中間標題 -->
-        <header class="text-center my-6">
-            <h1 class="text-xl font-medium tracking-widest text-neutral-800 uppercase">
-                0601 popup Le Sserafim
-            </h1>
-            <div class="w-12 h-[1px] bg-neutral-400 mx-auto mt-3"></div>
-        </header>
-
-        <!-- 載入中狀態 -->
-        <template x-if="loading">
-            <div class="flex flex-col items-center justify-center py-20">
-                <div class="spinner mb-4"></div>
-                <p class="text-sm text-neutral-500 tracking-wider">正在載入商品...</p>
-            </div>
-        </template>
-
-        <!-- 主要網頁內容 -->
-        <template x-if="!loading">
-            <div>
-                <!-- 商品列表 -->
-                <div class="grid grid-cols-2 gap-3 mb-8">
-                    <template x-for="product in products" :key="product.id">
-                        <div class="jp-card p-2.5 flex flex-col justify-between relative overflow-hidden"
-                             :class="isProductSelected(product.id) ? 'border-neutral-800 ring-1 ring-neutral-800' : ''">
-                            
-                            <!-- 商品圖片 -->
-                            <div class="w-full aspect-square bg-neutral-50 rounded mb-2 overflow-hidden relative">
-                                <img :src="product.photo" class="w-full h-full object-cover" alt="Product Image">
-                            </div>
-
-                            <!-- 商品資訊 -->
-                            <div class="flex-1 flex flex-col justify-between">
-                                <div>
-                                    <h3 class="text-xs font-medium text-neutral-800 line-clamp-2 leading-tight" x-text="product.name"></h3>
-                                    <p class="text-xs font-bold text-neutral-700 mt-1">HK$ <span x-text="product.price"></span></p>
-                                </div>
-
-                                <!-- 款式選取區域 (可複選) -->
-                                <div class="mt-2 pt-2 border-t border-dashed border-neutral-100">
-                                    <p class="text-[10px] text-neutral-400 mb-1">款式選擇 (可複選):</p>
-                                    <div class="space-y-1 max-h-24 overflow-y-auto pr-1">
-                                        <template x-for="sub in product.subs" :key="sub">
-                                            <div class="flex items-center justify-between bg-neutral-50 p-1 rounded text-[11px]">
-                                                <label class="flex items-center space-x-1 flex-1 cursor-pointer truncate">
-                                                    <input type="checkbox" 
-                                                           :checked="isSubChecked(product.id, sub)"
-                                                           @change="toggleSub(product, sub)"
-                                                           class="rounded text-neutral-800 focus:ring-0 w-3 h-3">
-                                                    <span class="truncate text-neutral-600" x-text="sub"></span>
-                                                </label>
-                                                
-                                                <!-- 數量選擇器 (勾選後顯示) -->
-                                                <template x-if="isSubChecked(product.id, sub)">
-                                                    <div class="flex items-center space-x-1 ml-1 bg-white border border-neutral-200 rounded">
-                                                        <button @click="changeQty(product.id, sub, -1)" class="px-1 text-neutral-500 hover:bg-neutral-100 font-bold">-</button>
-                                                        <span class="text-[10px] w-3 text-center font-medium" x-text="getQty(product.id, sub)"></span>
-                                                        <button @click="changeQty(product.id, sub, 1)" class="px-1 text-neutral-500 hover:bg-neutral-100 font-bold">+</button>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                </div>
-
-                <!-- 收件人與電話表單 -->
-                <div class="jp-card p-4 space-y-4 mb-6">
-                    <h2 class="text-sm font-medium border-l-2 border-neutral-700 pl-2 text-neutral-800 tracking-wider">收件人資料</h2>
-                    
-                    <div>
-                        <label class="block text-xs text-neutral-500 mb-1">收件人姓名 *</label>
-                        <input type="text" x-model="form.name" placeholder="請輸入姓名" class="w-full jp-input px-3 py-2 text-sm">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-neutral-500 mb-1">聯絡電話 *</label>
-                        <!-- 優化：加入 inputmode="numeric" 彈出純數字鍵盤 -->
-                        <input type="tel" inputmode="numeric" x-model="form.phone" @input="form.phone = form.phone.replace(/\D/g,'').substring(0,8)" placeholder="請輸入可收取SMS嘅手機號碼" class="w-full jp-input px-3 py-2 text-sm">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs text-neutral-500 mb-1">電子郵件 *</label>
-                        <input type="email" x-model="form.email" placeholder="請輸入電子郵件地址 (用於接收付款資料及訂單確認信)" class="w-full jp-input px-3 py-2 text-sm">
-                    </div>
-                </div>
-
-                <!-- 易寄取自提點連動篩選器 -->
-                <div class="jp-card p-4 space-y-4 mb-6">
-                    <h2 class="text-sm font-medium border-l-2 border-neutral-700 pl-2 text-neutral-800 tracking-wider">易寄取收件地址</h2>
-                    
-                    <!-- 關鍵字模糊搜尋 -->
-                    <div>
-                        <label class="block text-xs text-neutral-500 mb-1">搜尋門市 (可輸入編號或名稱, 輸入後於下方選擇自提點地址)</label>
-                        <input type="text" x-model="addressSearch" placeholder="例如: 7-Eleven / 旺角 / HK001" class="w-full jp-input px-3 py-2 text-sm">
-                    </div>
-
-                    <!-- 類別、地區、分區 階層下拉選單 -->
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="block text-[10px] text-neutral-400 mb-1">類別</label>
-                            <select x-model="filter.type" @change="resetAddressCascade('type')" class="w-full jp-input p-1.5 text-xs bg-white">
-                                <option value="">全部</option>
-                                <option value="郵政局">郵政局</option>
-                                <option value="智郵站">智郵站</option>
-                                <option value="7-Eleven">7-Eleven</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-neutral-400 mb-1">地區</label>
-                            <select x-model="filter.region" @change="resetAddressCascade('region')" class="w-full jp-input p-1.5 text-xs bg-white">
-                                <option value="">全部</option>
-                                <template x-for="r in availableRegions" :key="r">
-                                    <option :value="r" x-text="r"></option>
-                                </template>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-neutral-400 mb-1">分區</label>
-                            <select x-model="filter.district" @change="resetAddressCascade('district')" class="w-full jp-input p-1.5 text-xs bg-white">
-                                <option value="">全部</option>
-                                <template x-for="d in availableDistricts" :key="d">
-                                    <option :value="d" x-text="d"></option>
-                                </template>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- 最終自提點選單 -->
-                    <div>
-                        <label class="block text-xs text-neutral-500 mb-1">選擇自提點地址 *</label>
-                        <select x-model="selectedAddressIndex" class="w-full jp-input p-2 text-xs bg-white max-w-full">
-                            <option value="">-- 請選擇收件地址 --</option>
-                            <template x-for="(addr, idx) in filteredAddresses" :key="idx">
-                                <option :value="addr.originalIndex" :selected="selectedAddressIndex === addr.originalIndex" x-text="`[${addr.code}] ${addr.name} - ${addr.address}`"></option>
-                            </template>
-                        </select>
-                    </div>
-
-                    <!-- 自動顯示收件地址區塊 -->
-                    <div class="bg-neutral-50 p-3 rounded border border-neutral-100 text-xs space-y-1 text-neutral-600">
-                        <p class="font-medium text-neutral-800">收件地址自動對應：</p>
-                        <p>地區：<span class="text-neutral-900 font-medium" x-text="displayAddress.region || '（尚未選擇）'"></span></p>
-                        <p>分區：<span class="text-neutral-900 font-medium" x-text="displayAddress.district || '（尚未選擇）'"></span></p>
-                        <p>地址：<span class="text-neutral-900 font-medium" x-text="displayAddress.address || '（尚未選擇）'"></span></p>
-                    </div>
-                </div>
-
-                <!-- 付款方式 -->
-                <div class="jp-card p-4 space-y-3 mb-6">
-                    <h2 class="text-sm font-medium border-l-2 border-neutral-700 pl-2 text-neutral-800 tracking-wider">付款方式</h2>
-                    <div class="flex space-x-6 px-2">
-                        <label class="flex items-center space-x-2 text-sm cursor-pointer text-neutral-700">
-                            <input type="radio" name="payment" value="PayMe" x-model="form.paymentMethod" class="text-neutral-800 focus:ring-0">
-                            <span>PayMe</span>
-                        </label>
-                        <label class="flex items-center space-x-2 text-sm cursor-pointer text-neutral-700">
-                            <input type="radio" name="payment" value="FPS" x-model="form.paymentMethod" class="text-neutral-800 focus:ring-0">
-                            <span>轉數快 (FPS)</span>
-                        </label>
-                    </div>
-                </div>
-
-                <!-- 固定置底已選明細與結帳控制台 -->
-                <footer class="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 shadow-lg z-50">
-                    <div class="max-w-md mx-auto p-4">
-                        
-                        <!-- 底部即時顯示 -->
-                        <div class="mb-3 text-xs text-neutral-600 max-h-24 overflow-y-auto border-b border-neutral-100 pb-2">
-                            <p class="font-medium text-neutral-700 mb-1">已選商品及款式明細：</p>
-                            <template x-for="item in cartItems" :key="item.id + '-' + item.sub">
-                                <div class="flex justify-between text-neutral-500 py-0.5">
-                                    <span class="truncate max-w-[280px]" x-text="`${item.name} (${item.sub}) x${item.qty}`"></span>
-                                    <span class="font-medium text-neutral-700" x-text="`HK$${item.price * item.qty}`"></span>
-                                </div>
-                            </template>
-                            <template x-if="cartItems.length === 0">
-                                <p class="text-neutral-400 italic">請在上方勾選您想購買的商品款式與數量</p>
-                            </template>
-                        </div>
-
-                        <!-- 運費與加總金額 -->
-                        <div class="flex items-center justify-between">
-                            <div class="text-left">
-                                <p class="text-[10px] text-neutral-400">
-                                    小計: HK$<span x-text="subtotal"></span> | 
-                                    郵費: <span x-text="shippingFee === 0 ? '包郵' : 'HK$'+shippingFee"></span>
-                                </p>
-                                <p class="text-lg font-bold text-neutral-800">
-                                    總金額: <span class="text-neutral-900">HK$<span x-text="totalAmount"></span></span>
-                                </p>
-                            </div>
-                            
-                            <!-- 提交訂單按鈕 -->
-                            <button @click="submitOrder()" 
-                                    :disabled="submitting || cartItems.length === 0"
-                                    class="bg-neutral-800 text-white text-sm font-medium py-2.5 px-6 rounded-md tracking-widest transition duration-150 active:bg-neutral-900 disabled:bg-neutral-300 disabled:cursor-not-allowed flex items-center space-x-2">
-                                <template x-if="submitting">
-                                    <div class="spinner !w-4 !h-4 !border-left-color-white mr-2"></div>
-                                </template>
-                                <span x-text="submitting ? '提交中...' : '確認提交訂單'"></span>
-                            </button>
-                        </div>
-                    </div>
-                </footer>
-
-            </div>
-        </template>
+  <!-- TW Mercari -->
+  <div class="service-card mercari tw-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✓ 每月從日本寄出</li>
+        <li>✓ 無其他手續費</li>
+        <li>✓ 收到匯款馬上代購入</li>
+        <li>✓ 到台後以賣貨便收取國際運費，加國內運費 NT$38 寄出</li>
+        <li>✓ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率</strong>以每團每位客人的總購買金額計算<br>
+        <strong>到台運費：</strong>NT$20／50g（50g起跳，超過50g以實重計算）
+      </div>
+      <div class="service-contact">
+        <div class="service-contact-label">🔗 查詢報價請傳送 Mercari 商品連結</div>
+        <a class="contact-link" href="https://www.instagram.com/852hk.81jp?igsh=anhqNzQ1dGhlaWs4&utm_source=qr" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          @852hk.81jp
+        </a>
+        <a class="contact-link" href="https://wa.me/85293375712" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          WhatsApp
+        </a>
+      </div>
     </div>
+  </div>
 
-    <script>
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbx8IXQowEmcIAcn4i7lcxQQFs2FrTV5fgno8tujuBD5u2xW0CjMpXn2GtGsP4BMNEQo/exec";
+  <!-- ── Section 3: 通常商品代購 ── -->
+  <div class="section-header" id="general" style="scroll-margin-top: 72px;">
+    <div class="section-line"></div>
+    <div class="section-title general">🛍️ 通常商品代購</div>
+    <div class="section-line"></div>
+  </div>
 
-        function shopApp() {
-            return {
-                loading: true,
-                submitting: false,
-                products: [],
-                allAddresses: [],
-                addressSearch: '',
-                selectedAddressIndex: '',
-                
-                filter: {
-                    type: '',
-                    region: '',
-                    district: ''
-                },
-                
-                form: {
-                    name: '',
-                    phone: '',
-                    email: '',
-                    paymentMethod: 'PayMe'
-                },
-                
-                cart: {},
+  <div class="coming-soon">
+    <div class="cs-icon">🚧</div>
+    <div>即將推出，敬請期待！</div>
+    <div style="font-size:11px; margin-top:6px; color:#bbb;">Coming Soon</div>
+  </div>
 
-                async init() {
-                    try {
-                        const response = await fetch(GAS_API_URL);
-                        const data = await response.json();
-                        this.products = data.products;
-                        
-                        this.allAddresses = data.addresses.map((item, index) => {
-                            item.originalIndex = index;
-                            return item;
-                        });
-                    } catch (error) {
-                        console.error("無法加載動態資料:", error);
-                        alert("讀取 Google Sheet 資料失敗，請確認你的雲端硬碟檔案權限是否已開啟「知道連結的任何人皆可檢視」。");
-                    } finally {
-                        this.loading = false;
-                    }
-                },
+</main>
 
-                isProductSelected(productId) {
-                    return Object.keys(this.cart).some(key => key.startsWith(productId + '_'));
-                },
-                isSubChecked(productId, sub) {
-                    return !!this.cart[productId + '_' + sub];
-                },
-                toggleSub(product, sub) {
-                    const key = product.id + '_' + sub;
-                    if (this.cart[key]) {
-                        delete this.cart[key];
-                    } else {
-                        // 🛠️ 修正：必須在這裡把 product.yen 帶進去，後端才拿得到日幣計價
-                        this.cart[key] = {
-                            id: product.id,
-                            name: product.name,
-                            sub: sub,
-                            price: product.price,
-                            yen: product.yen || 0, 
-                            qty: 1
-                        };
-                    }
-                    this.cart = { ...this.cart };
-                },
-                getQty(productId, sub) {
-                    return this.cart[productId + '_' + sub]?.qty || 0;
-                },
-                changeQty(productId, sub, amount) {
-                    const key = productId + '_' + sub;
-                    if (!this.cart[key]) return;
-                    this.cart[key].qty += amount;
-                    if (this.cart[key].qty < 1) this.cart[key].qty = 1;
-                    this.cart = { ...this.cart };
-                },
-                
-                get cartItems() {
-                    return Object.values(this.cart);
-                },
-                get subtotal() {
-                    return this.cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
-                },
-                get shippingFee() {
-                    if (this.cartItems.length === 0) return 0;
-                    return this.subtotal >= 500 ? 0 : 10;
-                },
-                get totalAmount() {
-                    return this.subtotal + this.shippingFee;
-                },
+<script>
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
 
-                get availableRegions() {
-                    let set = new Set();
-                    this.allAddresses.forEach(a => {
-                        if (!this.filter.type || a.type === this.filter.type) set.add(a.region);
-                    });
-                    return Array.from(set);
-                },
-                get availableDistricts() {
-                    let set = new Set();
-                    this.allAddresses.forEach(a => {
-                        if ((!this.filter.type || a.type === this.filter.type) && 
-                            (!this.filter.region || a.region === this.filter.region)) {
-                            set.add(a.district);
-                        }
-                    });
-                    return Array.from(set);
-                },
-                get filteredAddresses() {
-                    let search = this.addressSearch.trim().toLowerCase();
-                    
-                    return this.allAddresses.filter(a => {
-                        if (this.filter.type && a.type !== this.filter.type) return false;
-                        if (this.filter.region && a.region !== this.filter.region) return false;
-                        if (this.filter.district && a.district !== this.filter.district) return false;
-                        
-                        if (search) {
-                            let matchCode = a.code.toLowerCase().includes(search);
-                            let matchName = a.name.toLowerCase().includes(search);
-                            let matchAddr = a.address.toLowerCase().includes(search);
-                            if (!matchCode && !matchName && !matchAddr) return false;
-                        }
-                        return true;
-                    });
-                },
-                resetAddressCascade(level) {
-                    if (level === 'type') { this.filter.region = ''; this.filter.district = ''; }
-                    if (level === 'region') { this.filter.district = ''; }
-                    // 🛠️ 優化：切換選單時連同關鍵字搜尋一起重設，避免選單過濾出錯
-                    this.addressSearch = ''; 
-                    this.selectedAddressIndex = '';
-                },
-                get displayAddress() {
-                    if (this.selectedAddressIndex === '') return {};
-                    return this.allAddresses[this.selectedAddressIndex] || {};
-                },
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+const SUPA_HEADERS = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
+async function sbGet(path) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: SUPA_HEADERS });
+  return res.ok ? res.json() : [];
+}
+function buildProducts(prodData, subData) {
+  return prodData.map(p => {
+    const subs = subData.filter(s => s.product_name === p.name);
+    const hasSubs = subs.some(s => s.sub_name !== '');
+    const limits = {};
+    subs.forEach(s => { if (s.stock_limit > 0) limits[s.sub_name === '' ? '__all__' : s.sub_name] = s.stock_limit; });
+    return { name: p.name, imageUrl: p.image_url, yenPrice: p.yen_price, hkdPrice: p.hkd_price, twdPrice: p.twd_price, weight: p.weight_g,
+      subs: hasSubs ? subs.map(s => s.sub_name) : [],
+      subImages: Object.fromEntries(subs.map(s => [s.sub_name, s.image_url || ''])),
+      subStockLimit: Object.keys(limits).length ? limits : null };
+  });
+}
+function buildOrderedQty(qtyData) {
+  const out = {};
+  qtyData.forEach(q => { out[q.product_name + '|' + q.sub_name] = q.qty_ordered; });
+  return out;
+}
+const EXCLUDED = ["Blank", "易寄取地址", "訂單紀錄", "Sheet1", "工作表1", "收單截止時間", "購貨紀錄", "盈利紀錄"];
 
-                // 驗證並送出訂單
-                async submitOrder() {
-                    if (this.cartItems.length === 0) {
-                        alert("購物車內無商品，請先選擇款式。");
-                        return;
-                    }
-                    if (!this.form.name.trim()) {
-                        alert("請輸入收件人姓名。");
-                        return;
-                    }
-                    if (!/^\d{8}$/.test(this.form.phone)) {
-                        alert("聯絡電話格式不正確，請輸入 8 位數字。");
-                        return;
-                    }
-                    if (!this.form.email.trim()) {
-                        alert("請輸入電子郵件地址。");
-                        return;
-                    }
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(this.form.email.trim())) {
-                        alert("電子郵件格式不正確，請重新檢查。");
-                        return;
-                    }
-                    if (this.selectedAddressIndex === '') {
-                        alert("請選擇易寄取收件門市地址。");
-                        return;
-                    }
+let currentRegion = localStorage.getItem('region') || 'hk';
+let allSheets = [];
+let deadlines = {};
 
-                    this.submitting = true;
+// ── Drawer ──
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const drawer = document.getElementById('drawer');
+const drawerOverlay = document.getElementById('drawerOverlay');
 
-                    // 1. 打包商品明細，並在背景計算日幣總額
-                    let grouped = {};
-                    let totalJPYAmount = 0; 
+function openDrawer() { drawer.classList.add('open'); drawerOverlay.classList.add('open'); hamburgerBtn.classList.add('open'); }
+function closeDrawer() { drawer.classList.remove('open'); drawerOverlay.classList.remove('open'); hamburgerBtn.classList.remove('open'); }
+hamburgerBtn.addEventListener('click', () => drawer.classList.contains('open') ? closeDrawer() : openDrawer());
+drawerOverlay.addEventListener('click', closeDrawer);
 
-                    this.cartItems.forEach(item => {
-                        if (!grouped[item.name]) grouped[item.name] = [];
-                        grouped[item.name].push(`${item.sub} x${item.qty}`);
-                        
-                        // 🛠️ 這裡現在可以正確讀到 item.yen 了！
-                        const itemYen = parseFloat(item.yen) || 0; 
-                        totalJPYAmount += itemYen * item.qty;
-                    });
+// ── Region ──
+function setRegion(region) {
+  currentRegion = region;
+  localStorage.setItem('region', region);
+  // 切換 body class 控制 hk-only / tw-only
+  document.body.classList.toggle('tw', region === 'tw');
+  document.querySelectorAll('[data-region]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.region === region);
+  });
+  renderCards();
+  renderDrawer();
+}
+document.querySelectorAll('[data-region]').forEach(btn => {
+  btn.addEventListener('click', () => setRegion(btn.dataset.region));
+});
 
-                    let itemsSummary = Object.keys(grouped).map(name => {
-                        return `${name} (${grouped[name].join(', ')})`;
-                    }).join(', ');
+// ── Deadline helpers ──
+function isExpired(name) {
+  if (!deadlines[name]) return false;
+  const dl = new Date(deadlines[name].replace(/\//g, '-'));
+  return isNaN(dl) ? false : new Date() > dl;
+}
+function countdownText(name) {
+  if (!deadlines[name]) return '';
+  const dl = new Date(deadlines[name].replace(/\//g, '-'));
+  if (isNaN(dl)) return '';
+  const diff = dl - new Date();
+  if (diff <= 0) return '已截止';
+  const h = Math.floor(diff / 3600000);
+  const m = Math.floor((diff % 3600000) / 60000);
+  if (h < 24) return `截單倒數 ${h}h ${m}m`;
+  return `截單倒數 ${Math.floor(h / 24)} 天`;
+}
+function buildUrl(name) {
+  const slug = name.replace(/\s+/g, '-');
+  return (currentRegion === 'tw' ? '/zh-tw/' : '/zh-hk/') + slug + '.html';
+}
 
-                    // 2. 打包 Payload 資料
-                    const payload = {
-                        itemsSummary: itemsSummary,
-                        totalAmount: this.totalAmount,
-                        shippingFee: this.shippingFee,
-                        paymentMethod: this.form.paymentMethod,
-                        totalJPYAmount: totalJPYAmount, // 背景塞入日幣總額給後端
-                        recipientName: this.form.name,
-                        recipientPhone: this.form.phone,
-                        recipientEmail: this.form.email.trim(),
-                        pickupType: this.displayAddress.type,
-                        pickupCode: this.displayAddress.code,
-                        pickupName: this.displayAddress.name,
-                        pickupAddress: this.displayAddress.address
-                    };
+// ── Render event cards ──
+function renderCards() {
+  const list = document.getElementById('eventList');
+  list.innerHTML = '';
+  const filtered = allSheets.filter(n => !n.startsWith('[Data]') && !n.startsWith('[END]') && EXCLUDED.indexOf(n) === -1);
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-msg">📭 暫時沒有進行中的快閃代購活動</div>';
+    return;
+  }
+  filtered.forEach(name => {
+    const expired = isExpired(name);
+    const cd = countdownText(name);
+    const regionLabel = currentRegion === 'tw' ? '台灣版 TWD' : '香港版 HKD';
+    const a = document.createElement('a');
+    a.className = `event-card ${currentRegion}${expired ? ' expired' : ''}`;
+    a.href = buildUrl(name);
+    a.innerHTML = `
+      <div class="ec-left">
+        <div class="ec-name">${name}</div>
+        <div class="ec-region">${regionLabel}</div>
+        ${cd ? `<div class="ec-countdown">${cd}</div>` : ''}
+      </div>
+      <div class="ec-right">
+        <span class="ec-badge ${expired ? 'closed' : 'open'}">${expired ? '已截止' : '進行中'}</span>
+        <span class="ec-arrow">→</span>
+      </div>`;
+    list.appendChild(a);
+  });
+}
 
-                    try {
-                        await fetch(GAS_API_URL, {
-                            method: 'POST',
-                            mode: 'no-cors',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        alert(`🎉 訂單提交成功！\n\n付款方式: ${this.form.paymentMethod}\n應付總額: HK$${this.totalAmount}\n\n訂購詳情及付款資料已Email到: ${this.form.email.trim()}\n\n我哋收取款項之後會為客人完成訂購，謝謝！`);
-                        
-                        // 成功後清空表單
-                        this.cart = {};
-                        this.form.name = '';
-                        this.form.phone = '';
-                        this.form.email = ''; 
-                        this.selectedAddressIndex = '';
-                        this.addressSearch = '';
-                        this.filter.type = '';
-                        this.filter.region = '';
-                        this.filter.district = '';
-                    } catch (error) {
-                        console.error("提交訂單時出錯:", error);
-                        alert("系統忙碌中或網路傳輸錯誤，請稍後再試。");
-                    } finally {
-                        this.submitting = false;
-                    }
-                }
-            }
-        }
-    </script>
+// ── Render drawer ──
+function renderDrawer() {
+  const container = document.getElementById('drawerEventList');
+  container.innerHTML = '';
+  const filtered = allSheets.filter(n => !n.startsWith('[Data]') && !n.startsWith('[END]') && EXCLUDED.indexOf(n) === -1);
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="padding:16px 20px; color:#aaa; font-size:13px;">目前沒有活動</div>';
+    return;
+  }
+  filtered.forEach(name => {
+    const expired = isExpired(name);
+    const a = document.createElement('a');
+    a.className = 'drawer-event-item';
+    a.href = buildUrl(name);
+    a.addEventListener('click', closeDrawer);
+    a.innerHTML = `
+      <span class="dei-name">${name}</span>
+      <span class="dei-status ${expired ? 'closed' : 'open'}">${expired ? '已截止' : '進行中'}</span>`;
+    container.appendChild(a);
+  });
+}
+
+// ── Load ──
+async function loadData() {
+  try {
+    const [sheetsRes, dlRes] = await Promise.all([
+      fetch(GAS_API_URL + '?action=getSheets'),
+      fetch(GAS_API_URL + '?action=getDeadlines')
+    ]);
+    allSheets = await sheetsRes.json();
+    deadlines = await dlRes.json();
+  } catch(e) { console.error(e); allSheets = []; deadlines = {}; }
+
+  document.getElementById('loadingWrap').style.display = 'none';
+  document.getElementById('eventList').style.display = 'flex';
+
+  // 初始化地區狀態
+  document.body.classList.toggle('tw', currentRegion === 'tw');
+  document.querySelectorAll('[data-region]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.region === currentRegion);
+  });
+
+  renderCards();
+  renderDrawer();
+  setInterval(renderCards, 60000);
+}
+
+loadData();
+</script>
 </body>
 </html>
