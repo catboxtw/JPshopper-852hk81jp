@@ -1778,23 +1778,67 @@ function confirmPayment(orderId) {
 
 function syncCurrentEventToSupabase() {
   const evName = currentStockSheet;
-  if (!evName) { alert('請先選擇活動'); return; }
-  const btn = event.currentTarget;
-  btn.innerText = '⏳ 同步中...'; btn.disabled = true;
-  fetch(GAS, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'syncEventToSupabase', eventName: evName })
+  if (!evName) {
+    alert('請先選擇活動');
+    return;
+  }
+
+  const btn =
+    (typeof event !== 'undefined' && event.currentTarget)
+      ? event.currentTarget
+      : document.querySelector('button[onclick="syncCurrentEventToSupabase()"]');
+
+  const originalText = btn ? btn.innerText : '☁️ 同步 Supabase';
+
+  if (btn) {
+    btn.innerText = '⏳ 同步中...';
+    btn.disabled = true;
+  }
+
+  const url =
+    GAS +
+    '?action=syncEventToSupabase' +
+    '&eventName=' + encodeURIComponent(evName) +
+    '&_=' + Date.now();
+
+  fetch(url, {
+    method: 'GET',
+    cache: 'no-store'
   })
-  .then(r => r.json())
-  .then(data => {
-    btn.innerText = '☁️ 同步 Supabase'; btn.disabled = false;
-    if (data.result === 'ok') {
-      alert(`✅ 已同步「${evName}」到 Supabase（${data.synced || 0} 件商品）`);
-    } else {
-      alert('❌ 同步失敗：' + (data.message || JSON.stringify(data)));
-    }
-  })
-  .catch(e => { btn.innerText = '☁️ 同步 Supabase'; btn.disabled = false; alert('❌ 錯誤：' + e); });
+    .then(async r => {
+      const text = await r.text();
+
+      if (!r.ok) {
+        throw new Error('HTTP ' + r.status + ': ' + text);
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        throw new Error('GAS 回傳不是 JSON：' + text.slice(0, 200));
+      }
+    })
+    .then(data => {
+      if (btn) {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
+
+      if (data.result === 'ok') {
+        alert(`✅ 已同步「${evName}」到 Supabase（${data.synced || 0} 件商品）`);
+      } else {
+        alert('❌ 同步失敗：' + (data.message || data.error || JSON.stringify(data)));
+      }
+    })
+    .catch(e => {
+      if (btn) {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
+
+      alert('❌ 錯誤：' + e.message);
+      console.error('[syncCurrentEventToSupabase]', e);
+    });
 }
 
 function loadProducts(sheetName) {
