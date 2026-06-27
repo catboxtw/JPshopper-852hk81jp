@@ -332,7 +332,7 @@ function buildProducts(prodData, subData) {
     const hasSubs = subs.some(s => s.sub_name !== '');
     const limits = {};
     subs.forEach(s => { if (s.stock_limit > 0) limits[s.sub_name === '' ? '__all__' : s.sub_name] = s.stock_limit; });
-    return { name: p.name, imageUrl: p.image_url, yenPrice: p.yen_price, hkdPrice: p.hkd_price, twdPrice: p.twd_price, weight: p.weight_g,
+    return { name: p.name, id: p.name, photo: p.image_url, yen: p.yen_price, hkdPrice: p.hkd_price, twd: p.twd_price, price: p.twd_price, weight: p.weight_g,
       subs: hasSubs ? subs.map(s => s.sub_name) : [],
       subImages: Object.fromEntries(subs.map(s => [s.sub_name, s.image_url || ''])),
       subStockLimit: Object.keys(limits).length ? limits : null };
