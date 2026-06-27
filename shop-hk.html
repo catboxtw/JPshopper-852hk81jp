@@ -362,10 +362,12 @@ function buildProducts(prodData, subData) {
     });
     return {
       name: p.name,
-      imageUrl: p.image_url,
-      yenPrice: p.yen_price,
+      id: p.name,
+      photo: p.image_url,
+      yen: p.yen_price,
+      price: p.hkd_price,
       hkdPrice: p.hkd_price,
-      twdPrice: p.twd_price,
+      twd: p.twd_price,
       weight: p.weight_g,
       subs: hasSubs ? subs.map(s => s.sub_name) : [],
       subImages: Object.fromEntries(subs.map(s => [s.sub_name, s.image_url || ''])),
@@ -405,7 +407,7 @@ async function loadDrawerEvents() {
       const expired = ev.deadline ? new Date() > new Date(ev.deadline) : false;
       const a = document.createElement('a');
       a.className = 'drawer-item' + (ev.name === curEvent ? ' active' : '');
-      a.href = '/zh-hk/' + ev.name.replace(/\s+/g,'-') + '.html';
+      a.href = 'shop-hk.html?event=' + encodeURIComponent(ev.name);
       a.innerHTML = `<span>${ev.name}</span><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${expired?'#fce4ec':'#e8f5e9'};color:${expired?'#c62828':'#2e7d32'};font-weight:600;">${expired?'已截止':'進行中'}</span>`;
       container.appendChild(a);
     });

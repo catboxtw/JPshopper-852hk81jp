@@ -372,7 +372,7 @@ async function loadDrawerEvents() {
       const expired = deadlines[name] ? new Date() > new Date(deadlines[name].replace(/\//g,'-')) : false;
       const a = document.createElement('a');
       a.className = 'drawer-item';
-      a.href = '/zh-tw/' + slug + '.html';
+      a.href = 'shop-tw.html?event=' + encodeURIComponent(name);
       a.innerHTML = `<span>${name}</span><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${expired?'#fce4ec':'#e8f5e9'};color:${expired?'#c62828':'#2e7d32'};font-weight:600;">${expired?'已截止':'進行中'}</span>`;
       container.appendChild(a);
     });

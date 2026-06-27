@@ -432,8 +432,9 @@ function countdownText(name) {
   return `截單倒數 ${Math.floor(h / 24)} 天`;
 }
 function buildUrl(name) {
-  const slug = name.replace(/\s+/g, '-');
-  return (currentRegion === 'tw' ? '/zh-tw/' : '/zh-hk/') + slug + '.html';
+  return currentRegion === 'tw'
+    ? 'shop-tw.html?event=' + encodeURIComponent(name)
+    : 'shop-hk.html?event=' + encodeURIComponent(name);
 }
 
 // ── Render event cards ──
