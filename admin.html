@@ -850,6 +850,10 @@
                 style="padding:6px 12px;background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
                 ☁️ 同步 Supabase
               </button>
+              <button onclick="syncAllEventsToSupabase()"
+  style="padding:6px 12px;background:#fff7ed;border:1px solid #fed7aa;color:#c2410c;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+  ☁️ 同步全部活動
+</button>
               <button id="stockBatchSaveBtn" onclick="saveStockChanges()"
                 style="display:none;padding:7px 16px;background:#111;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
                 💾 儲存變更 <span id="stockBatchCount" style="background:#fff;color:#111;border-radius:10px;padding:1px 7px;margin-left:4px;font-size:11px;">0</span>
@@ -4665,6 +4669,37 @@ function openSidebar() {
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+  function syncAllEventsToSupabase() {
+  if (!confirm('確定要同步所有活動到 Supabase 嗎？\n商品較多時可能需要等一會。')) return;
+
+  const btn = event.currentTarget;
+  const originalText = btn.innerText;
+
+  btn.innerText = '⏳ 全部同步中...';
+  btn.disabled = true;
+
+  fetch(GAS + '?action=syncAllEventsToSupabase&_=' + Date.now(), {
+    method: 'GET',
+    cache: 'no-store'
+  })
+    .then(r => r.json())
+    .then(data => {
+      btn.innerText = originalText;
+      btn.disabled = false;
+
+      if (data.result === 'ok' || data.result === 'partial') {
+        alert(`✅ 同步完成\n成功：${data.ok || 0}\n失敗：${data.failed || 0}\n總數：${data.total || 0}`);
+      } else {
+        alert('❌ 同步失敗：' + (data.message || JSON.stringify(data)));
+      }
+    })
+    .catch(e => {
+      btn.innerText = originalText;
+      btn.disabled = false;
+      alert('❌ 錯誤：' + e.message);
+    });
 }
 </script>
 </body>
