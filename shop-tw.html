@@ -405,7 +405,7 @@ function shopApp() {
 
     get isClosed() {
       if (!this.deadline) return false;
-      const dl = new Date(this.deadline.replace(/\//g,'-'));
+      const dl = new Date(this.deadline);
       return !isNaN(dl) && new Date() > dl;
     },
 
@@ -436,7 +436,7 @@ function shopApp() {
         ]);
         this.products   = buildProducts(prodData, subData);
         this.orderedQty = buildOrderedQty(qtyData);
-        this.deadline   = evData[0]?.deadline ? new Date(evData[0].deadline).toLocaleString('zh-TW',{hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).replace(/\//g,'/') : '';
+        this.deadline   = evData[0]?.deadline || '';
       } catch(e) { alert('載入商品失敗，請稍後再試。'); }
       finally { this.loading = false; }
       // 啟動倒數計時
@@ -482,7 +482,7 @@ function shopApp() {
     startCountdown() {
       const tick = () => {
         if (!this.deadline) return;
-        const dl = new Date(this.deadline.replace(/\//g, '-'));
+        const dl = new Date(this.deadline);
         const now = new Date();
         const diff = dl - now;
         if (diff <= 0) {
