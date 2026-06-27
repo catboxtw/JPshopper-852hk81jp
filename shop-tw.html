@@ -277,6 +277,10 @@
   </div>
 </div>
 
+    </div>
+  </template>
+</div>
+
 <!-- Footer cart -->
 <footer class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-50" style="border-color:#e8e6e1;">
   <div class="max-w-md mx-auto relative h-0">
@@ -366,7 +370,7 @@ function switchToHK() {
 
 async function loadDrawerEvents() {
   try {
-    const events = await sbGet('events?select=name,deadline,is_ended&order=sort_order');
+    const events = await sbGet('events?select=name,deadline,is_ended&order=updated_at.desc');
     const container = document.getElementById('drawerEvents');
     container.innerHTML = '';
     const curSlug = window.location.pathname.split('/').pop().replace(/\.html$/i, '');
