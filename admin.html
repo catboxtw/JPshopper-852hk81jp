@@ -1791,16 +1791,22 @@ async function syncCurrentEventToSupabase() {
   btn.disabled = true;
 
   try {
-    const rows = buildStockRows(evName, stockData);
-    const res = await fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, {
-      method: 'POST',
-      headers: SUPA_H,
-      body: JSON.stringify(rows)
-    });
-    if (!res.ok) throw new Error(await res.text());
+    let deadlines = {};
+    try { const r = await fetch(GAS + '?action=getDeadlines'); deadlines = await r.json(); } catch(e) {}
+
+    const { prodRows, subRows } = buildAllSyncRows(evName, stockData, true);
+    const evRow = buildEventRow(evName, deadlines, allSheets.indexOf(evName));
+
+    const results = await Promise.all([
+      fetch(`${SUPA_URL}/rest/v1/events?on_conflict=name`, { method:'POST', headers:SUPA_H, body:JSON.stringify([evRow]) }),
+      fetch(`${SUPA_URL}/rest/v1/products?on_conflict=event_name,name`, { method:'POST', headers:SUPA_H, body:JSON.stringify(prodRows) }),
+      fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, { method:'POST', headers:SUPA_H, body:JSON.stringify(subRows) })
+    ]);
+    for (const res of results) { if (!res.ok) throw new Error(await res.text()); }
+
     btn.innerText = origText;
     btn.disabled = false;
-    alert(`✅ 已同步「${evName}」庫存到 Supabase（${rows.length} 筆）`);
+    alert(`✅ 已同步「${evName}」到 Supabase（${prodRows.length} 件商品，${subRows.length} 筆庫存）`);
   } catch (e) {
     btn.innerText = origText;
     btn.disabled = false;
@@ -1809,17 +1815,40 @@ async function syncCurrentEventToSupabase() {
   }
 }
 
-function buildStockRows(evName, products) {
-  const rows = [];
-  products.forEach(p => {
-    const curSsl = stockChanges.hasOwnProperty(p.row) ? stockChanges[p.row] : p.subStockLimit;
+function buildEventRow(evName, deadlines, idx) {
+  const cleanName = evName.replace(/^\[END\]\s*/i, '');
+  const isEnded = /^\[END\]/i.test(evName);
+  const dl = deadlines[cleanName] || deadlines[evName] || null;
+  let deadline = null, isPast = false;
+  if (dl) {
+    try { deadline = new Date(dl.replace(/\//g, '-')).toISOString(); isPast = new Date() > new Date(dl.replace(/\//g, '-')); } catch(e) {}
+  }
+  return { name: cleanName, deadline, is_active: !isEnded && !isPast, is_ended: isEnded, sort_order: idx + 1 };
+}
+
+function buildAllSyncRows(evName, products, applyChanges) {
+  const cleanEv = evName.replace(/^\[END\]\s*/i, '');
+  const prodRows = [], subRows = [];
+  products.forEach((p, idx) => {
+    prodRows.push({
+      event_name: cleanEv, name: p.name, image_url: p.photo || null,
+      yen_price: p.yen_price || p.yen || 0,
+      hkd_price: p.hkd_price || p.price || 0,
+      twd_price: p.twd_price || p.twd || 0,
+      weight_g: p.weight_g || p.weight || 0,
+      sort_order: idx + 1
+    });
+    const curSsl = (applyChanges && stockChanges.hasOwnProperty(p.row)) ? stockChanges[p.row] : p.subStockLimit;
     const subs = p.subsArray && p.subsArray.length ? p.subsArray : (p.subs ? p.subs.split(' / ').map(s => s.trim()) : []);
-    subs.forEach(sub => {
-      const limit = getSubLimit(curSsl, sub);
-      rows.push({ event_name: evName, product_name: p.name, sub_name: sub, stock_limit: limit });
+    subs.forEach((sub, si) => {
+      subRows.push({ event_name: cleanEv, product_name: p.name, sub_name: sub, stock_limit: getSubLimit(curSsl, sub), sort_order: si + 1 });
     });
   });
-  return rows;
+  return { prodRows, subRows };
+}
+
+function buildStockRows(evName, products) {
+  return buildAllSyncRows(evName, products, false).subRows;
 }
 
 function loadProducts(sheetName) {
@@ -4658,22 +4687,27 @@ async function syncAllEventsToSupabase() {
   btn.disabled = true;
 
   let ok = 0, failed = 0;
-  const events = allSheets.filter(n => !n.startsWith('[Data]') && EXCLUDED.indexOf(n) === -1);
+  const eventList = allSheets.filter(n => !n.startsWith('[Data]') && EXCLUDED.indexOf(n) === -1);
 
-  for (const evName of events) {
+  let deadlines = {};
+  try { const r = await fetch(GAS + '?action=getDeadlines'); deadlines = await r.json(); } catch(e) {}
+
+  for (const evName of eventList) {
     try {
       const r = await fetch(GAS + '?action=getProducts&sheetName=' + encodeURIComponent(evName));
       const data = await r.json();
       const products = data.products || [];
-      if (!products.length) { ok++; continue; }
-      const rows = buildStockRows(evName, products);
-      if (!rows.length) { ok++; continue; }
-      const res = await fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, {
-        method: 'POST',
-        headers: SUPA_H,
-        body: JSON.stringify(rows)
-      });
-      if (!res.ok) throw new Error(await res.text());
+      const evRow = buildEventRow(evName, deadlines, eventList.indexOf(evName));
+      const { prodRows, subRows } = buildAllSyncRows(evName, products, false);
+
+      const reqs = [
+        fetch(`${SUPA_URL}/rest/v1/events?on_conflict=name`, { method:'POST', headers:SUPA_H, body:JSON.stringify([evRow]) })
+      ];
+      if (prodRows.length) reqs.push(fetch(`${SUPA_URL}/rest/v1/products?on_conflict=event_name,name`, { method:'POST', headers:SUPA_H, body:JSON.stringify(prodRows) }));
+      if (subRows.length) reqs.push(fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, { method:'POST', headers:SUPA_H, body:JSON.stringify(subRows) }));
+
+      const results = await Promise.all(reqs);
+      for (const res of results) { if (!res.ok) throw new Error(await res.text()); }
       ok++;
     } catch (e) {
       failed++;
@@ -4683,7 +4717,7 @@ async function syncAllEventsToSupabase() {
 
   btn.innerText = origText;
   btn.disabled = false;
-  alert(`✅ 同步完成\n成功：${ok}\n失敗：${failed}\n總數：${events.length}`);
+  alert(`✅ 同步完成\n成功：${ok}\n失敗：${failed}\n總數：${eventList.length}`);
 }
 
   function gasJsonp(params) {
