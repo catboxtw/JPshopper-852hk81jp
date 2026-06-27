@@ -1783,7 +1783,6 @@ function syncCurrentEventToSupabase() {
   btn.innerText = '⏳ 同步中...'; btn.disabled = true;
   fetch(GAS, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'syncEventToSupabase', eventName: evName })
   })
   .then(r => r.json())
