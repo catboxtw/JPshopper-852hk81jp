@@ -249,46 +249,24 @@
       </div>
 
       <!-- Payment（TW版：郵局匯款 / LINE PAY） -->
-      <div class="jp-card p-4 space-y-3 mb-6 max-w-2xl">
-        <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#2980b9;">付款方式</h2>
-        <div class="space-y-2 px-2">
-          <label class="flex items-center space-x-2 text-sm cursor-pointer">
-            <input type="radio" name="payment" value="郵局銀行匯款" x-model="form.paymentMethod">
-            <span>🏦 郵局銀行匯款</span>
-          </label>
-          <label class="flex items-center space-x-2 text-sm cursor-pointer">
-            <input type="radio" name="payment" value="LINE PAY" x-model="form.paymentMethod">
-            <span><span style="display:inline-flex;align-items:center;gap:4px;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect width="16" height="16" rx="4" fill="#00B900"/><text x="2" y="12" font-size="9" fill="white" font-weight="bold">L</text></svg> LINE PAY</span></span>
-          </label>
-        </div>
-
-        <!-- 郵局說明 -->
-        <div x-show="form.paymentMethod === '郵局銀行匯款'"
-          style="background:#f0f7ff; border:1px solid #bbdefb; border-radius:6px; padding:12px 14px; font-size:12px; color:#37474f; line-height:1.9;">
-          🏦 郵局匯款資訊將於確認信中顯示，請記得在備注欄填寫手機末3碼
-        </div>
-
-        <!-- LINE PAY 說明 -->
-        <div x-show="form.paymentMethod === 'LINE PAY'"
-          style="background:#f0fff4; border:1px solid #bbf7d0; border-radius:6px; padding:14px; font-size:12px; color:#166534; line-height:1.9;">
-          <div style="font-weight:700; margin-bottom:8px;">💚 LINE PAY 付款步驟</div>
-          <div>① 完成訂單後，點擊連結加入我們的 LINE</div>
-          <div>② 完成付款後，在聊天頁面複製以下格式並傳送給我們：</div>
-          <div style="background:#fff; border:1px solid #86efac; border-radius:6px; padding:10px 12px; margin:8px 0; font-family:monospace; font-size:12px; color:#111; line-height:2;">
-            訂單編號：<span x-text="currentOrderId || 'ORD-XXXXXXX'"></span><br>
-            手機末3碼：<span x-text="form.phone ? form.phone.slice(-3) : 'XXX'"></span><br>
-            金額：NT$ <span x-text="(subtotal).toLocaleString()"></span><br>
-            已付款💰
-          </div>
-          <a href="https://line.me/ti/p/tf98MWHnC5" target="_blank"
-            style="display:inline-block; background:#00B900; color:#fff; font-size:13px; font-weight:700; padding:8px 20px; border-radius:20px; text-decoration:none; margin-top:4px;">
-            💚 加入 LINE 並付款
-          </a>
-        </div>
-      </div>
-
-    </div>
-  </template>
+<div class="jp-card p-4 space-y-3 mb-6 max-w-2xl">
+  <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#2980b9;">付款方式</h2>
+  <div class="space-y-2 px-2">
+    <label class="flex items-center space-x-2 text-sm cursor-pointer">
+      <input type="radio" name="payment" value="郵局銀行匯款" x-model="form.paymentMethod">
+      <span>🏦 郵局銀行匯款</span>
+    </label>
+    <label class="flex items-center space-x-2 text-sm cursor-pointer">
+      <input type="radio" name="payment" value="LINE PAY" x-model="form.paymentMethod">
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 40 40" fill="none"><rect width="40" height="40" rx="8" fill="#00B900"/><text x="6" y="28" font-size="22" fill="white" font-weight="bold">L</text></svg>
+        LINE PAY
+      </span>
+    </label>
+  </div>
+  <div style="background:#f5f5f5;border-radius:6px;padding:10px 14px;font-size:12px;color:#666;line-height:1.8;">
+    💡 付款資料將於確認信中顯示
+  </div>
 </div>
 
 <!-- Footer cart -->
