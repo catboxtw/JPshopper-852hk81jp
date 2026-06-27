@@ -1780,39 +1780,46 @@ function confirmPayment(orderId) {
 
 // ── Stock ──
 
-function syncCurrentEventToSupabase() {
+async function syncCurrentEventToSupabase() {
   const evName = currentStockSheet;
-  if (!evName) {
-    alert('請先選擇活動');
-    return;
-  }
+  if (!evName) { alert('請先選擇活動'); return; }
+  if (!stockData.length) { alert('請先載入商品'); return; }
 
   const btn = event.currentTarget;
-  const originalText = btn.innerText;
-
+  const origText = btn.innerText;
   btn.innerText = '⏳ 同步中...';
   btn.disabled = true;
 
-  gasJsonp({
-    action: 'syncEventToSupabase',
-    eventName: evName
-  })
-    .then(data => {
-      btn.innerText = originalText;
-      btn.disabled = false;
-
-      if (data.result === 'ok') {
-        alert(`✅ 已同步「${evName}」到 Supabase（${data.synced || 0} 件商品）`);
-      } else {
-        alert('❌ 同步失敗：' + (data.message || JSON.stringify(data)));
-      }
-    })
-    .catch(e => {
-      btn.innerText = originalText;
-      btn.disabled = false;
-      alert('❌ 錯誤：' + e.message);
-      console.error('[syncCurrentEventToSupabase]', e);
+  try {
+    const rows = buildStockRows(evName, stockData);
+    const res = await fetch(`${SUPA_URL}/rest/v1/product_subs`, {
+      method: 'POST',
+      headers: SUPA_H,
+      body: JSON.stringify(rows)
     });
+    if (!res.ok) throw new Error(await res.text());
+    btn.innerText = origText;
+    btn.disabled = false;
+    alert(`✅ 已同步「${evName}」庫存到 Supabase（${rows.length} 筆）`);
+  } catch (e) {
+    btn.innerText = origText;
+    btn.disabled = false;
+    alert('❌ 同步失敗：' + e.message);
+    console.error('[syncCurrentEventToSupabase]', e);
+  }
+}
+
+function buildStockRows(evName, products) {
+  const rows = [];
+  products.forEach(p => {
+    const curSsl = stockChanges.hasOwnProperty(p.row) ? stockChanges[p.row] : p.subStockLimit;
+    const subs = p.subsArray && p.subsArray.length ? p.subsArray : (p.subs ? p.subs.split(' / ').map(s => s.trim()) : []);
+    subs.forEach(sub => {
+      const limit = getSubLimit(curSsl, sub);
+      rows.push({ event_name: evName, product_name: p.name, sub_name: sub, stock_limit: limit });
+    });
+  });
+  return rows;
 }
 
 function loadProducts(sheetName) {
@@ -4641,35 +4648,42 @@ function closeSidebar() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-  function syncAllEventsToSupabase() {
-  if (!confirm('確定要同步所有活動到 Supabase 嗎？\n商品較多時可能需要等一會。')) return;
+async function syncAllEventsToSupabase() {
+  if (!allSheets.length) { alert('活動清單尚未載入，請稍後再試'); return; }
+  if (!confirm('確定要同步所有活動的庫存到 Supabase 嗎？\n商品較多時可能需要等一會。')) return;
 
   const btn = event.currentTarget;
-  const originalText = btn.innerText;
-
+  const origText = btn.innerText;
   btn.innerText = '⏳ 全部同步中...';
   btn.disabled = true;
 
-  fetch(GAS + '?action=syncAllEventsToSupabase&_=' + Date.now(), {
-    method: 'GET',
-    cache: 'no-store'
-  })
-    .then(r => r.json())
-    .then(data => {
-      btn.innerText = originalText;
-      btn.disabled = false;
+  let ok = 0, failed = 0;
+  const events = allSheets.filter(n => !n.startsWith('[Data]') && EXCLUDED.indexOf(n) === -1);
 
-      if (data.result === 'ok' || data.result === 'partial') {
-        alert(`✅ 同步完成\n成功：${data.ok || 0}\n失敗：${data.failed || 0}\n總數：${data.total || 0}`);
-      } else {
-        alert('❌ 同步失敗：' + (data.message || JSON.stringify(data)));
-      }
-    })
-    .catch(e => {
-      btn.innerText = originalText;
-      btn.disabled = false;
-      alert('❌ 錯誤：' + e.message);
-    });
+  for (const evName of events) {
+    try {
+      const r = await fetch(GAS + '?action=getProducts&sheetName=' + encodeURIComponent(evName));
+      const data = await r.json();
+      const products = data.products || [];
+      if (!products.length) { ok++; continue; }
+      const rows = buildStockRows(evName, products);
+      if (!rows.length) { ok++; continue; }
+      const res = await fetch(`${SUPA_URL}/rest/v1/product_subs`, {
+        method: 'POST',
+        headers: SUPA_H,
+        body: JSON.stringify(rows)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      ok++;
+    } catch (e) {
+      failed++;
+      console.error('[syncAllEventsToSupabase]', evName, e);
+    }
+  }
+
+  btn.innerText = origText;
+  btn.disabled = false;
+  alert(`✅ 同步完成\n成功：${ok}\n失敗：${failed}\n總數：${events.length}`);
 }
 
   function gasJsonp(params) {
