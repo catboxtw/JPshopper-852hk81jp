@@ -399,22 +399,32 @@ hamBtn.addEventListener('click', () => { drawer.classList.toggle('open'); drawer
 drawerOverlay.addEventListener('click', () => { drawer.classList.remove('open'); drawerOverlay.classList.remove('open'); hamBtn.classList.remove('open'); });
 
 function switchToTW() {
-  const path = window.location.pathname.replace('/zh-hk/', '/zh-tw/');
-  window.location.href = path;
+  if (window.location.pathname.startsWith('/zh-hk/')) {
+    window.location.href = window.location.pathname.replace('/zh-hk/', '/zh-tw/');
+    return;
+  }
+  const eventName = new URLSearchParams(window.location.search).get('event');
+  if (eventName) {
+    window.location.href = '/zh-tw/' + encodeURIComponent(eventName.replace(/\s+/g, '-')) + '.html';
+  } else {
+    window.location.href = '/zh-tw/';
+  }
 }
 
 // Load drawer events
+const DRAWER_EXCL = new Set(["易寄取地址","Blank","訂單紀錄","收單截止時間","購貨紀錄","盈利紀錄"]);
 async function loadDrawerEvents() {
   try {
     const events = await sbGet('events?is_ended=eq.false&is_active=eq.true&select=name,deadline&order=updated_at.desc');
     const container = document.getElementById('drawerEvents');
     container.innerHTML = '';
-    const curEvent = new URLSearchParams(window.location.search).get('event') || '';
-    events.forEach(ev => {
+    const curSlug = decodeURIComponent(window.location.pathname.split('/').pop().replace(/\.html$/i, ''));
+    events.filter(ev => !DRAWER_EXCL.has(ev.name)).forEach(ev => {
       const expired = ev.deadline ? new Date() > new Date(ev.deadline) : false;
+      const slug = ev.name.replace(/\s+/g, '-');
       const a = document.createElement('a');
-      a.className = 'drawer-item' + (ev.name === curEvent ? ' active' : '');
-      a.href = 'shop-hk.html?event=' + encodeURIComponent(ev.name);
+      a.className = 'drawer-item' + (slug === curSlug ? ' active' : '');
+      a.href = '/zh-hk/' + encodeURIComponent(slug) + '.html';
       a.innerHTML = `<span>${ev.name}</span><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${expired?'#fce4ec':'#e8f5e9'};color:${expired?'#c62828':'#2e7d32'};font-weight:600;">${expired?'已截止':'進行中'}</span>`;
       container.appendChild(a);
     });
@@ -598,7 +608,7 @@ function shopApp() {
         if (this.filter.type && a.type !== this.filter.type) return false;
         if (this.filter.region && a.region !== this.filter.region) return false;
         if (this.filter.district && a.district !== this.filter.district) return false;
-        if (search && !a.code.toLowerCase().includes(search) && !a.name.toLowerCase().includes(search) && !a.address.toLowerCase().includes(search)) return false;
+        if (search && !(a.code||'').toLowerCase().includes(search) && !(a.name||'').toLowerCase().includes(search) && !(a.address||'').toLowerCase().includes(search)) return false;
         return true;
       });
     },
@@ -615,7 +625,7 @@ function shopApp() {
       if (this.emailTypoWarn) {
         if (!confirm(`電郵地址可能有錯字（${this.form.email}），建議改為 ${this.emailTypoSuggestion}。\n確定要繼續使用原本的地址提交嗎？`)) return;
       }
-      if (this.cart.length===0 || !this.form.name.trim() || !this.form.phone.trim() || !this.form.email.trim()) {
+      if (this.cartItems.length===0 || !this.form.name.trim() || !this.form.phone.trim() || !this.form.email.trim() || this.selectedAddressIndex==='') {
         alert('請確認所有必填欄位（姓名、電話、電郵、收件地址）及已勾選商品。'); return;
       }
       this.submitting = true;
