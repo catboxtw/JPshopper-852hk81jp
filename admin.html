@@ -1792,7 +1792,7 @@ async function syncCurrentEventToSupabase() {
 
   try {
     const rows = buildStockRows(evName, stockData);
-    const res = await fetch(`${SUPA_URL}/rest/v1/product_subs`, {
+    const res = await fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, {
       method: 'POST',
       headers: SUPA_H,
       body: JSON.stringify(rows)
@@ -4668,7 +4668,7 @@ async function syncAllEventsToSupabase() {
       if (!products.length) { ok++; continue; }
       const rows = buildStockRows(evName, products);
       if (!rows.length) { ok++; continue; }
-      const res = await fetch(`${SUPA_URL}/rest/v1/product_subs`, {
+      const res = await fetch(`${SUPA_URL}/rest/v1/product_subs?on_conflict=event_name,product_name,sub_name`, {
         method: 'POST',
         headers: SUPA_H,
         body: JSON.stringify(rows)
