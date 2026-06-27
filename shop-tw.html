@@ -364,22 +364,31 @@ hamBtn.addEventListener('click', () => { drawer.classList.toggle('open'); drawer
 drawerOverlay.addEventListener('click', () => { drawer.classList.remove('open'); drawerOverlay.classList.remove('open'); hamBtn.classList.remove('open'); });
 
 function switchToHK() {
-  const path = window.location.pathname.replace('/zh-tw/', '/zh-hk/');
-  window.location.href = path;
+  if (window.location.pathname.startsWith('/zh-tw/')) {
+    window.location.href = window.location.pathname.replace('/zh-tw/', '/zh-hk/');
+    return;
+  }
+  const eventName = new URLSearchParams(window.location.search).get('event');
+  if (eventName) {
+    window.location.href = '/zh-hk/' + encodeURIComponent(eventName.replace(/\s+/g, '-')) + '.html';
+  } else {
+    window.location.href = '/zh-hk/';
+  }
 }
 
+const DRAWER_EXCL = new Set(["易寄取地址","Blank","訂單紀錄","收單截止時間","購貨紀錄","盈利紀錄"]);
 async function loadDrawerEvents() {
   try {
-    const events = await sbGet('events?select=name,deadline,is_ended&order=updated_at.desc');
+    const events = await sbGet('events?is_ended=eq.false&is_active=eq.true&select=name,deadline&order=updated_at.desc');
     const container = document.getElementById('drawerEvents');
     container.innerHTML = '';
-    const curSlug = window.location.pathname.split('/').pop().replace(/\.html$/i, '');
-    events.forEach(ev => {
-      const expired = ev.is_ended || (ev.deadline ? new Date() > new Date(ev.deadline) : false);
+    const curSlug = decodeURIComponent(window.location.pathname.split('/').pop().replace(/\.html$/i, ''));
+    events.filter(ev => !DRAWER_EXCL.has(ev.name)).forEach(ev => {
+      const expired = ev.deadline ? new Date() > new Date(ev.deadline) : false;
       const slug = ev.name.replace(/\s+/g, '-');
       const a = document.createElement('a');
       a.className = 'drawer-item' + (slug === curSlug ? ' active' : '');
-      a.href = '/zh-tw/' + slug + '.html';
+      a.href = '/zh-tw/' + encodeURIComponent(slug) + '.html';
       a.innerHTML = `<span>${ev.name}</span><span style="font-size:10px;padding:2px 8px;border-radius:20px;background:${expired?'#fce4ec':'#e8f5e9'};color:${expired?'#c62828':'#2e7d32'};font-weight:600;">${expired?'已截止':'進行中'}</span>`;
       container.appendChild(a);
     });
@@ -589,10 +598,8 @@ function shopApp() {
 
       try {
         await fetch(GAS_API_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-        const resData2 = typeof resData !== 'undefined' ? resData : {};
-        this.currentOrderId = resData2.orderId || '';
         if (this.form.paymentMethod === 'LINE PAY') {
-          alert(`🎉 訂單送出成功！\n\n訂單編號：${this.currentOrderId}\n請在 LINE 聊天頁面複製付款資訊並傳送給我們。`);
+          alert(`🎉 訂單送出成功！\n\n請在 LINE 聊天頁面複製付款資訊並傳送給我們。`);
         } else {
           alert(`🎉 訂單送出成功！\n\n商品小計：NT$${this.subtotal}\n確認信已寄出，請於指定時間內完成匯款。\n如遇缺貨，我們將依收到匯款的先後順序安排商品。謝謝！`);
         }
