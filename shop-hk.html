@@ -406,7 +406,7 @@ function switchToTW() {
 // Load drawer events
 async function loadDrawerEvents() {
   try {
-    const events = await sbGet('events?is_ended=eq.false&is_active=eq.true&select=name,deadline&order=sort_order');
+    const events = await sbGet('events?is_ended=eq.false&is_active=eq.true&select=name,deadline&order=updated_at.desc');
     const container = document.getElementById('drawerEvents');
     container.innerHTML = '';
     const curEvent = new URLSearchParams(window.location.search).get('event') || '';
