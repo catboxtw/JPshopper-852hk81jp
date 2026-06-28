@@ -577,7 +577,8 @@ function shopApp() {
       if (this.cart[key]) { delete this.cart[key]; }
       else {
         if (this.isSoldOut(product, sub)) return;
-        this.cart[key] = {id:product.id, name:product.name, sub, price:parseFloat(product.price)||0, twd:parseFloat(product.twd)||0, yen:parseFloat(product.yen)||0, qty:1};
+        const photo = (product.subImages && product.subImages[sub]) || product.photo || '';
+        this.cart[key] = {id:product.id, name:product.name, sub, price:parseFloat(product.price)||0, twd:parseFloat(product.twd)||0, yen:parseFloat(product.yen)||0, qty:1, photo};
       }
       this.cart = {...this.cart};
     },
