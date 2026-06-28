@@ -216,7 +216,7 @@
 
 <!-- Top bar -->
 <div class="topbar">
-  <a href="/" class="brand">852hk.81jp</a>
+  <a href="/" class="brand" id="topbarBrand">852hk.81jp</a>
   <button class="hamburger" id="hamburgerBtn" aria-label="選單">
     <span></span><span></span><span></span>
   </button>
@@ -252,7 +252,7 @@
 <!-- Main -->
 <main class="main">
   <div class="hero">
-    <div class="hero-brand">852hk.81jp</div>
+    <div class="hero-brand" id="heroBrand">852hk.81jp</div>
     <div class="hero-divider"></div>
     <div class="hero-sub">日本代購服務</div>
   </div>
@@ -406,11 +406,13 @@ drawerOverlay.addEventListener('click', closeDrawer);
 function setRegion(region) {
   currentRegion = region;
   localStorage.setItem('region', region);
-  // 切換 body class 控制 hk-only / tw-only
   document.body.classList.toggle('tw', region === 'tw');
   document.querySelectorAll('[data-region]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.region === region);
   });
+  const brandName = region === 'tw' ? '886tw.81jp' : '852hk.81jp';
+  document.getElementById('topbarBrand').textContent = brandName;
+  document.getElementById('heroBrand').textContent = brandName;
   renderCards();
   renderDrawer();
 }
@@ -512,6 +514,9 @@ async function loadData() {
   document.querySelectorAll('[data-region]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.region === currentRegion);
   });
+  const initBrand = currentRegion === 'tw' ? '886tw.81jp' : '852hk.81jp';
+  document.getElementById('topbarBrand').textContent = initBrand;
+  document.getElementById('heroBrand').textContent = initBrand;
 
   renderCards();
   renderDrawer();
