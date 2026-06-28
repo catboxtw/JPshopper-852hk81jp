@@ -295,7 +295,7 @@
           <select x-model="selectedAddressIndex" class="w-full jp-input p-2 text-xs bg-white">
             <option value="">— 請選擇收件地址 —</option>
             <template x-for="(addr, idx) in filteredAddresses" :key="idx">
-              <option :value="addr.originalIndex" :selected="Number(selectedAddressIndex) === addr.originalIndex" x-text="`[${addr.code}] ${addr.name} - ${addr.address}`"></option>
+              <option :value="addr.originalIndex" :selected="selectedAddressIndex !== '' && Number(selectedAddressIndex) === addr.originalIndex" x-text="`[${addr.code}] ${addr.name} - ${addr.address}`"></option>
             </template>
           </select>
         </div>
