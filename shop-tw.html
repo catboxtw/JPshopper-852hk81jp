@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>現場快閃代購 — 886tw.81jp</title>
   <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -61,6 +61,10 @@
       border-radius: 5px; display: flex; align-items: center; gap: 6px;
     }
     .email-typo-fix { cursor: pointer; color: #0284c7; text-decoration: underline; font-weight: 700; }
+    @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
+    .lightbox-overlay { position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.88); display: flex; align-items: center; justify-content: center; padding: 16px; cursor: zoom-out; }
+    .lightbox-img { max-width: 90vw; max-height: 88vh; object-fit: contain; border-radius: 4px; cursor: default; }
+    .lightbox-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; background: rgba(255,255,255,0.9); border: none; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; line-height: 1; }
   </style>
 </head>
 <body class="min-h-screen pb-64" x-data="shopApp()" x-init="init()">
@@ -162,7 +166,7 @@
             </template>
 
             <div class="w-full aspect-square bg-neutral-50 rounded mb-2 overflow-hidden">
-              <img :src="product.photo" class="w-full h-full object-cover" alt="">
+              <img :src="product.photo" class="w-full h-full object-cover cursor-zoom-in" @click="product.photo && openLightbox(product.photo)" alt="">
             </div>
             <div class="flex-1 flex flex-col justify-between">
               <div>
@@ -238,7 +242,7 @@
       </div>
 
       <!-- Recipient form -->
-      <div id="recipient-section" class="jp-card p-4 space-y-4 mb-6 scroll-mt-4 max-w-2xl">
+      <div id="recipient-section" class="jp-card p-4 space-y-4 mb-6 scroll-mt-4 max-w-2xl mx-auto">
         <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#2980b9;">訂購人資料</h2>
         <div>
           <label class="block text-xs mb-1" style="color:#888;">姓名 *</label>
@@ -267,7 +271,7 @@
       </div>
 
       <!-- 台灣收件說明（取代易寄取選址） -->
-      <div class="jp-card p-4 mb-6 max-w-2xl">
+      <div class="jp-card p-4 mb-6 max-w-2xl mx-auto">
         <h2 class="text-sm font-medium border-l-2 pl-2 mb-4" style="border-color:#2980b9;">台灣取貨方式</h2>
         <div class="tw-notice">
           <div class="tw-notice-title">📦 賣貨便到貨取貨流程</div>
@@ -284,7 +288,7 @@
       </div>
 
       <!-- Payment（TW版：郵局匯款 / LINE PAY） -->
-<div class="jp-card p-4 space-y-3 mb-6 max-w-2xl">
+<div class="jp-card p-4 space-y-3 mb-6 max-w-2xl mx-auto">
   <h2 class="text-sm font-medium border-l-2 pl-2" style="border-color:#2980b9;">付款方式</h2>
   <div class="space-y-2 px-2">
     <label class="flex items-center space-x-2 text-sm cursor-pointer">
@@ -307,6 +311,14 @@
     </div>
   </template>
 </div>
+
+<!-- Lightbox -->
+<template x-teleport="body">
+  <div x-show="lightboxOpen" class="lightbox-overlay" @click.self="closeLightbox()" @keydown.escape.window="closeLightbox()" style="display:none;">
+    <button class="lightbox-close" @click="closeLightbox()">×</button>
+    <img :src="lightboxSrc" class="lightbox-img" @click.stop alt="">
+  </div>
+</template>
 
 <!-- Footer cart -->
 <footer class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-50" style="border-color:#e8e6e1;">
@@ -443,6 +455,10 @@ function shopApp() {
     countdownD: '00', countdownH: '00', countdownM: '00', countdownS: '00',
     countdownUrgent: false,
     _countdownTimer: null,
+    lightboxOpen: false, lightboxSrc: '',
+
+    openLightbox(src) { this.lightboxSrc = src; this.lightboxOpen = true; },
+    closeLightbox() { this.lightboxOpen = false; this.lightboxSrc = ''; },
 
     get isClosed() {
       if (!this.deadline) return false;
