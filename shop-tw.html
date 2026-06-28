@@ -329,9 +329,14 @@
     <div class="mb-3 text-xs max-h-20 overflow-y-auto border rounded bg-neutral-50 p-2" style="border-color:#e8e6e1;">
       <p class="font-medium mb-1" style="color:#555;">已選商品明細：</p>
       <template x-for="item in cartItems" :key="item.id+'-'+item.sub">
-        <div class="flex justify-between py-0.5 border-b border-dashed last:border-0" style="color:#888; border-color:#e0e0e0;">
-          <span class="truncate max-w-[240px]" x-text="`${item.name}${item.sub ? ' {'+item.sub+'}' : ''} [x${item.qty}]`"></span>
-          <span class="font-medium tw-accent" x-text="`NT$${parseFloat(item.twd||0) * parseInt(item.qty||1)}`"></span>
+        <div class="py-0.5 border-b border-dashed last:border-0" style="border-color:#e0e0e0;">
+          <div class="flex justify-between items-baseline">
+            <span class="truncate font-medium" style="color:#444;" x-text="item.name"></span>
+            <span class="ml-2 shrink-0 font-medium tw-accent" x-text="`NT$${parseFloat(item.twd||0) * parseInt(item.qty||1)}`"></span>
+          </div>
+          <div class="text-[10px]" style="color:#aaa;">
+            <span x-text="(item.sub ? '款式：' + item.sub + '　' : '') + '數量：×' + item.qty"></span>
+          </div>
         </div>
       </template>
       <template x-if="cartItems.length===0">
