@@ -166,41 +166,65 @@
                 <p class="text-[10px] mt-0.5" style="color:#aaa;" x-text="product.yen ? '¥' + product.yen : ''"></p>
               </div>
               <div class="mt-2 pt-2 border-t border-dashed border-neutral-100">
-                <template x-if="product.subs.length > 1 || (product.subs.length === 1 && product.subs[0] !== '')">
-                  <p class="text-[10px] mb-1" style="color:#aaa;">款式選擇（可複選）</p>
-                </template>
-                <div class="space-y-1 max-h-24 overflow-y-auto">
-                  <template x-for="sub in product.subs" :key="sub">
-                    <div class="flex items-center justify-between bg-neutral-50 p-1 rounded text-[11px]"
-                         :style="isSoldOut(product, sub) ? 'background:#fff0f0;' : ''">
-                      <label class="flex items-center space-x-1 flex-1 cursor-pointer truncate"
-                             :class="(isClosed || isSoldOut(product, sub)) ? 'opacity-50 pointer-events-none' : ''">
-                        <input type="checkbox"
-                               :checked="isSubChecked(product.id, sub)"
-                               @change="!isClosed && !isSoldOut(product, sub) && toggleSub(product, sub)"
-                               :disabled="isClosed || isSoldOut(product, sub)"
-                               class="w-3 h-3">
-                        <span class="truncate" style="color:#555;" x-text="sub || '加入'"></span>
-                      </label>
-                      <!-- Sold Out 標籤 -->
-                      <template x-if="isSoldOut(product, sub)">
-                        <span style="font-size:9px; color:#c62828; font-weight:700; background:#fce4ec; padding:1px 5px; border-radius:3px; white-space:nowrap;">SOLD OUT</span>
-                      </template>
-                      <!-- 剩餘數量提示（剩1-3件時顯示） -->
-                      <template x-if="!isSoldOut(product, sub) && remaining(product, sub) !== null && remaining(product, sub) <= 3 && remaining(product, sub) > 0">
-                        <span style="font-size:9px; color:#e67e22; font-weight:600; white-space:nowrap;" x-text="'僅剩'+remaining(product, sub)+'件'"></span>
-                      </template>
-                      <!-- 數量加減器 -->
-                      <template x-if="isSubChecked(product.id, sub) && !isSoldOut(product, sub)">
-                        <div class="flex items-center space-x-1 ml-1 bg-white border border-neutral-200 rounded">
-                          <button @click="changeQty(product.id, sub, -1)" class="px-1 text-neutral-500 font-bold">-</button>
-                          <span class="text-[10px] w-3 text-center" x-text="getQty(product.id, sub)"></span>
-                          <button @click="changeQty(product.id, sub, 1)" class="px-1 text-neutral-500 font-bold">+</button>
+                <!-- 有款式：多選列表 -->
+                <template x-if="product.subs[0] !== ''">
+                  <div>
+                    <p class="text-[10px] mb-1" style="color:#aaa;">款式選擇（可複選）</p>
+                    <div class="space-y-1 max-h-24 overflow-y-auto">
+                      <template x-for="sub in product.subs" :key="sub">
+                        <div class="flex items-center justify-between bg-neutral-50 p-1 rounded text-[11px]"
+                             :style="isSoldOut(product, sub) ? 'background:#fff0f0;' : ''">
+                          <label class="flex items-center space-x-1 flex-1 cursor-pointer truncate"
+                                 :class="(isClosed || isSoldOut(product, sub)) ? 'opacity-50 pointer-events-none' : ''">
+                            <input type="checkbox"
+                                   :checked="isSubChecked(product.id, sub)"
+                                   @change="!isClosed && !isSoldOut(product, sub) && toggleSub(product, sub)"
+                                   :disabled="isClosed || isSoldOut(product, sub)"
+                                   class="w-3 h-3">
+                            <span class="truncate" style="color:#555;" x-text="sub"></span>
+                          </label>
+                          <template x-if="isSoldOut(product, sub)">
+                            <span style="font-size:9px; color:#c62828; font-weight:700; background:#fce4ec; padding:1px 5px; border-radius:3px; white-space:nowrap;">SOLD OUT</span>
+                          </template>
+                          <template x-if="!isSoldOut(product, sub) && remaining(product, sub) !== null && remaining(product, sub) <= 3 && remaining(product, sub) > 0">
+                            <span style="font-size:9px; color:#e67e22; font-weight:600; white-space:nowrap;" x-text="'僅剩'+remaining(product, sub)+'件'"></span>
+                          </template>
+                          <template x-if="isSubChecked(product.id, sub) && !isSoldOut(product, sub)">
+                            <div class="flex items-center space-x-1 ml-1 bg-white border border-neutral-200 rounded">
+                              <button @click="changeQty(product.id, sub, -1)" class="px-1 text-neutral-500 font-bold">-</button>
+                              <span class="text-[10px] w-3 text-center" x-text="getQty(product.id, sub)"></span>
+                              <button @click="changeQty(product.id, sub, 1)" class="px-1 text-neutral-500 font-bold">+</button>
+                            </div>
+                          </template>
                         </div>
                       </template>
                     </div>
-                  </template>
-                </div>
+                  </div>
+                </template>
+                <!-- 無款式：直接加減數量 -->
+                <template x-if="product.subs[0] === ''">
+                  <div class="flex items-center justify-between bg-neutral-50 p-1 rounded text-[11px]"
+                       :style="isSoldOut(product, '') ? 'background:#fff0f0;' : ''">
+                    <div class="flex-1">
+                      <template x-if="!isSoldOut(product,'') && remaining(product,'') !== null && remaining(product,'') <= 3 && remaining(product,'') > 0">
+                        <span style="font-size:9px; color:#e67e22; font-weight:600;" x-text="'僅剩'+remaining(product,'')+'件'"></span>
+                      </template>
+                    </div>
+                    <template x-if="isSoldOut(product, '')">
+                      <span style="font-size:9px; color:#c62828; font-weight:700; background:#fce4ec; padding:1px 5px; border-radius:3px;">SOLD OUT</span>
+                    </template>
+                    <template x-if="!isSoldOut(product, '') && !isClosed">
+                      <div class="flex items-center space-x-1 bg-white border border-neutral-200 rounded">
+                        <button @click="isSubChecked(product.id,'') && (getQty(product.id,'')>1 ? changeQty(product.id,'',-1) : toggleSub(product,''))"
+                                :disabled="!isSubChecked(product.id,'')"
+                                class="px-1 text-neutral-500 font-bold">-</button>
+                        <span class="text-[10px] w-3 text-center" x-text="isSubChecked(product.id,'') ? getQty(product.id,'') : 0"></span>
+                        <button @click="!isSubChecked(product.id,'') ? toggleSub(product,'') : changeQty(product.id,'',1)"
+                                class="px-1 text-neutral-500 font-bold">+</button>
+                      </div>
+                    </template>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
