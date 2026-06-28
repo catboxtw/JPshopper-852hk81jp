@@ -646,8 +646,6 @@ function shopApp() {
       });
     },
     resetAddressCascade(level) {
-      if (level==='type') { this.filter.region=''; this.filter.district=''; }
-      if (level==='region') this.filter.district='';
       if (this.selectedAddressIndex !== '' && !this.filteredAddresses.some(a => a.originalIndex === Number(this.selectedAddressIndex))) this.selectedAddressIndex='';
     },
     get displayAddress() { return this.selectedAddressIndex==='' ? {} : (this.allAddresses[this.selectedAddressIndex]||{}); },
