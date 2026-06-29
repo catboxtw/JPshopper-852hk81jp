@@ -163,7 +163,7 @@
     .spinner { border: 2px solid rgba(0,0,0,0.08); width: 22px; height: 22px; border-radius: 50%; border-left-color: var(--ink); animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .empty-msg { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; line-height: 1.8; }
-    .nissen-marquee-outer { overflow-x: auto; border-radius: 8px; background: linear-gradient(90deg,#fff8f0,#fff3fa); border: 1px solid #fce4ec; margin-bottom: 12px; cursor: grab; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .nissen-marquee-outer { overflow-x: auto; border-radius: 8px; background: linear-gradient(90deg,#fff8f0,#fff3fa); border: 1px solid #fce4ec; margin-bottom: 12px; cursor: grab; scrollbar-width: none; }
     .nissen-marquee-outer::-webkit-scrollbar { display: none; }
     .nissen-marquee-outer:active { cursor: grabbing; }
     .nissen-marquee-inner { display: inline-flex; align-items: flex-start; padding: 8px 0; }
@@ -786,13 +786,15 @@ async function copyAllNissenSlots(region) {
 }
 
 function initNissenMarqueeScroll(outer) {
-  let paused = false, userScrolling = false, resumeTimer;
+  let paused = false, userScrolling = false, resumeTimer, tick = 0;
 
   function autoScroll() {
     if (!paused && !userScrolling) {
-      outer.scrollLeft += 0.6;
-      // 無縫循環：捲到一半就重置（因為內容複製了一份）
-      if (outer.scrollLeft >= outer.scrollWidth / 2) outer.scrollLeft = 0;
+      // 每 2 frame 移動 1px（整數安全，兼容手機瀏覽器）
+      if (++tick % 2 === 0) {
+        outer.scrollLeft += 1;
+        if (outer.scrollLeft >= outer.scrollWidth / 2) outer.scrollLeft = 0;
+      }
     }
     requestAnimationFrame(autoScroll);
   }
