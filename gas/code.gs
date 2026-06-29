@@ -603,10 +603,23 @@ function fetchNissenProduct_(url) {
       } catch(e3) {}
     }
 
+    // 翻譯日文→繁中（只翻譯含日文字符的文字）
+    if (result.name) result.name = nissenTranslate_(result.name);
+    result.variants.forEach(function(v) {
+      v.group = nissenTranslate_(v.group);
+      v.options.forEach(function(o) { if (o.name) o.name = nissenTranslate_(o.name); });
+    });
+
     return result;
   } catch(e) {
     return { error: '抓取失敗：' + e.toString() };
   }
+}
+
+function nissenTranslate_(text) {
+  if (!text || !/[぀-ヿ一-鿿＀-￯]/.test(text)) return text;
+  try { return LanguageApp.translate(text, 'ja', 'zh-TW') || text; }
+  catch(e) { return text; }
 }
 
 // 从 HTML 中提取 var <varName> = [...] 的完整 JSON 数组（支持嵌套括号）
