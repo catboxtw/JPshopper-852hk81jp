@@ -605,11 +605,12 @@ async function fetchNissenSlot(slotEl, region) {
 
     if (data.error) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`; return; }
 
-    const rate      = region === 'hk' ? 0.059 : 0.24;
-    const currency  = region === 'hk' ? 'HK$' : 'NT$';
+    const rate       = region === 'hk' ? 0.059 : 0.24;
+    const currency   = region === 'hk' ? 'HK$' : 'NT$';
     const localPrice = data.price ? Math.ceil(data.price * rate) : null;
-    const jpyStr    = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
-    const localStr  = localPrice ? `${currency}${localPrice.toLocaleString()}起` : null;
+    const jpyStr     = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
+    const localStr   = localPrice ? `${currency}${localPrice.toLocaleString()}起` : null;
+    const localLabel = region === 'hk' ? '港幣' : '台幣';
 
     let html = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;">';
 
@@ -624,38 +625,47 @@ async function fetchNissenSlot(slotEl, region) {
       html += '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">（未能取得價格）</p>';
     }
 
+    let hasVariants = false;
     if (data.variants && data.variants.length > 0) {
-      // 顏色
+      hasVariants = true;
+
+      // ── 顏色（可點選）
       const hasColors = data.variants.length > 1 || data.variants[0].group !== '';
       if (hasColors) {
-        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">顏色</p>';
-        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">顏色 <span style="font-weight:400;font-size:9px;">（點選）</span></p>';
+        html += '<div class="nissen-color-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
         data.variants.forEach(g => {
           const anyIn  = g.options.some(o => o.inStock && !o.reserve);
           const anyRes = !anyIn && g.options.some(o => o.reserve);
           const bg  = anyRes ? '#fff3e0' : (anyIn ? '#e8f5e9' : '#f5f5f5');
           const clr = anyRes ? '#e65100' : (anyIn ? '#2e7d32' : '#aaa');
           const sk  = (!anyIn && !anyRes) ? 'text-decoration:line-through;' : '';
-          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${clr};${sk}">${anyRes ? g.group+'(予約)' : g.group}</span>`;
+          const lbl = anyRes ? g.group + '(予約)' : g.group;
+          html += `<button type="button" class="nissen-clr-btn" data-value="${g.group}"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${lbl}</button>`;
         });
         html += '</div>';
       }
-      // 尺寸（各顏色合併）
+
+      // ── 尺寸（可點選，各顏色合併，跳過空值）
       const sizeMap = {}, sizeOrder = [];
       data.variants.forEach(g => g.options.forEach(o => {
+        if (!o.name) return;
         if (!sizeMap[o.name]) { sizeMap[o.name] = {inStock:false, reserve:false}; sizeOrder.push(o.name); }
         if (o.inStock && !o.reserve) sizeMap[o.name].inStock = true;
         if (o.reserve) sizeMap[o.name].reserve = true;
       }));
       if (sizeOrder.length > 0) {
-        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">尺寸</p>';
-        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">尺寸 <span style="font-weight:400;font-size:9px;">（點選）</span></p>';
+        html += '<div class="nissen-size-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
         sizeOrder.forEach(n => {
-          const s  = sizeMap[n];
+          const s   = sizeMap[n];
           const bg  = s.reserve ? '#fff3e0' : (s.inStock ? '#e8f5e9' : '#f5f5f5');
           const clr = s.reserve ? '#e65100' : (s.inStock ? '#2e7d32' : '#aaa');
           const sk  = (!s.inStock && !s.reserve) ? 'text-decoration:line-through;' : '';
-          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${clr};${sk}">${s.reserve ? n+'(予約)' : n}</span>`;
+          const lbl = s.reserve ? n + '(予約)' : n;
+          html += `<button type="button" class="nissen-sz-btn" data-value="${n}"
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${lbl}</button>`;
         });
         html += '</div>';
       }
@@ -664,23 +674,41 @@ async function fetchNissenSlot(slotEl, region) {
       html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
     }
 
-    // 一鍵複製
-    const localLabel = region === 'hk' ? '港幣' : '台幣';
-    const copyText = `${url}\n款式/顏色：\n尺寸：\n日幣＆${localLabel}：${jpyStr || ''}${localStr ? ' / '+localStr : ''}\n\n請幫我代購~ 謝謝!✨`;
+    // ── 複製區
     html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">';
-    html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">一鍵複製聯絡店主購買吧～</p>';
+    if (hasVariants) html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>';
+    else html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">一鍵複製聯絡店主購買吧～</p>';
     html += '<button class="nissen-copy-btn" style="width:100%;padding:8px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">📋 複製訂購資料</button>';
     html += '</div>';
     html += '<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>';
     html += '</div>';
     resultEl.innerHTML = html;
 
+    // ── 顏色選擇
+    let selectedColor = '', selectedSize = '';
+    resultEl.querySelectorAll('.nissen-clr-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        resultEl.querySelectorAll('.nissen-clr-btn').forEach(b => b.style.borderColor = 'transparent');
+        btn.style.borderColor = 'currentColor';
+        selectedColor = btn.dataset.value;
+      });
+    });
+    resultEl.querySelectorAll('.nissen-sz-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        resultEl.querySelectorAll('.nissen-sz-btn').forEach(b => b.style.borderColor = 'transparent');
+        btn.style.borderColor = 'currentColor';
+        selectedSize = btn.dataset.value;
+      });
+    });
+
+    // ── 複製按鈕
     const copyBtn = resultEl.querySelector('.nissen-copy-btn');
     if (copyBtn) {
       copyBtn.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(copyText); }
+        const text = `${url}\n款式/顏色：${selectedColor}\n尺寸：${selectedSize}\n日幣＆${localLabel}：${jpyStr || ''}${localStr ? ' / '+localStr : ''}\n\n請幫我代購~ 謝謝!✨`;
+        try { await navigator.clipboard.writeText(text); }
         catch(_) {
-          const ta = Object.assign(document.createElement('textarea'), {value: copyText});
+          const ta = Object.assign(document.createElement('textarea'), {value: text});
           document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
         }
         copyBtn.textContent = '✓ 已複製！';

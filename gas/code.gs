@@ -595,7 +595,7 @@ function fetchNissenProduct_(url) {
           if (!cName && !sName) return;
           if (!colorMap[cName]) { colorMap[cName] = []; colorOrder.push(cName); }
           var inStock = !sku.soldOut && (typeof sku.allocatableStock === 'undefined' || sku.allocatableStock > 0);
-          colorMap[cName].push({ name: sName || cName, inStock: inStock, reserve: !!sku.reserve });
+          colorMap[cName].push({ name: sName, inStock: inStock, reserve: !!sku.reserve });
         });
         colorOrder.forEach(function(c) {
           result.variants.push({ group: c || '款式', options: colorMap[c] });
