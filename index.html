@@ -369,6 +369,8 @@
         <div id="nissenSlotsHK"></div>
         <button onclick="addNissenSlot('hk')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
+        <button id="nissenCopyAllHK" onclick="copyAllNissenSlots('hk')"
+          style="display:none;margin-top:6px;padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;">📋 複製所有訂購資料</button>
       </div>
     </div>
   </div>
@@ -391,6 +393,8 @@
         <div id="nissenSlotsTW"></div>
         <button onclick="addNissenSlot('tw')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
+        <button id="nissenCopyAllTW" onclick="copyAllNissenSlots('tw')"
+          style="display:none;margin-top:6px;padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;">📋 複製所有訂購資料</button>
       </div>
     </div>
   </div>
@@ -599,27 +603,23 @@ async function fetchNissenSlot(slotEl, region) {
   resultEl.innerHTML = '<p style="font-size:12px;color:#888;">⏳ 查詢中，請稍候...</p>';
 
   try {
-    const apiUrl = GAS_API_URL + '?action=getNissenProduct&url=' + encodeURIComponent(url);
-    const resp = await fetch(apiUrl);
+    const resp = await fetch(GAS_API_URL + '?action=getNissenProduct&url=' + encodeURIComponent(url));
     const data = await resp.json();
-
     if (data.error) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`; return; }
 
     const rate       = region === 'hk' ? 0.059 : 0.24;
     const currency   = region === 'hk' ? 'HK$' : 'NT$';
-    const localPrice = data.price ? Math.ceil(data.price * rate) : null;
-    const jpyStr     = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
-    const localStr   = localPrice ? `${currency}${localPrice.toLocaleString()}起` : null;
     const localLabel = region === 'hk' ? '港幣' : '台幣';
+    const defJpy     = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
+    const defLocal   = data.price ? `${currency}${Math.ceil(data.price * rate).toLocaleString()}起` : null;
 
     let html = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;">';
-
     if (data.name) html += `<p style="font-weight:600;color:var(--ink);margin-bottom:8px;font-size:13px;line-height:1.5;">${data.name}</p>`;
 
-    if (jpyStr) {
+    if (defJpy) {
       html += '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap;">';
-      html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong>${jpyStr}</strong></span>`;
-      if (localStr) html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${localStr}</strong></span>`;
+      html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong class="nissen-jpy">${defJpy}</strong></span>`;
+      if (defLocal) html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong class="nissen-local">${defLocal}</strong></span>`;
       html += '</div>';
     } else {
       html += '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">（未能取得價格）</p>';
@@ -628,26 +628,21 @@ async function fetchNissenSlot(slotEl, region) {
     let hasVariants = false;
     if (data.variants && data.variants.length > 0) {
       hasVariants = true;
-
-      // ── 顏色（可點選）
       const hasColors = data.variants.length > 1 || data.variants[0].group !== '';
       if (hasColors) {
         html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">顏色 <span style="font-weight:400;font-size:9px;">（點選）</span></p>';
-        html += '<div class="nissen-color-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
         data.variants.forEach(g => {
           const anyIn  = g.options.some(o => o.inStock && !o.reserve);
           const anyRes = !anyIn && g.options.some(o => o.reserve);
           const bg  = anyRes ? '#fff3e0' : (anyIn ? '#e8f5e9' : '#f5f5f5');
           const clr = anyRes ? '#e65100' : (anyIn ? '#2e7d32' : '#aaa');
           const sk  = (!anyIn && !anyRes) ? 'text-decoration:line-through;' : '';
-          const lbl = anyRes ? g.group + '(予約)' : g.group;
           html += `<button type="button" class="nissen-clr-btn" data-value="${g.group}"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${lbl}</button>`;
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${anyRes ? g.group+'(予約)' : g.group}</button>`;
         });
         html += '</div>';
       }
-
-      // ── 尺寸（可點選，各顏色合併，跳過空值）
       const sizeMap = {}, sizeOrder = [];
       data.variants.forEach(g => g.options.forEach(o => {
         if (!o.name) return;
@@ -657,15 +652,14 @@ async function fetchNissenSlot(slotEl, region) {
       }));
       if (sizeOrder.length > 0) {
         html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">尺寸 <span style="font-weight:400;font-size:9px;">（點選）</span></p>';
-        html += '<div class="nissen-size-row" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
         sizeOrder.forEach(n => {
-          const s   = sizeMap[n];
+          const s  = sizeMap[n];
           const bg  = s.reserve ? '#fff3e0' : (s.inStock ? '#e8f5e9' : '#f5f5f5');
           const clr = s.reserve ? '#e65100' : (s.inStock ? '#2e7d32' : '#aaa');
           const sk  = (!s.inStock && !s.reserve) ? 'text-decoration:line-through;' : '';
-          const lbl = s.reserve ? n + '(予約)' : n;
           html += `<button type="button" class="nissen-sz-btn" data-value="${n}"
-            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${lbl}</button>`;
+            style="font-size:11px;padding:3px 9px;border-radius:12px;border:2px solid transparent;cursor:pointer;background:${bg};color:${clr};${sk}">${s.reserve ? n+'(予約)' : n}</button>`;
         });
         html += '</div>';
       }
@@ -674,52 +668,102 @@ async function fetchNissenSlot(slotEl, region) {
       html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
     }
 
-    // ── 複製區
     html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">';
-    if (hasVariants) html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>';
-    else html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">一鍵複製聯絡店主購買吧～</p>';
-    html += '<button class="nissen-copy-btn" style="width:100%;padding:8px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">📋 複製訂購資料</button>';
+    html += `<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">${hasVariants ? '👆 點選顏色及尺寸後，' : ''}一鍵複製聯絡店主購買吧～</p>`;
+    html += '<button class="nissen-copy-btn" style="width:100%;padding:8px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">📋 複製此商品</button>';
     html += '</div>';
     html += '<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>';
     html += '</div>';
     resultEl.innerHTML = html;
 
-    // ── 顏色選擇
-    let selectedColor = '', selectedSize = '';
+    // 儲存 slot 狀態
+    slotEl._nissen = { url, name: data.name || '', data, rate, currency, localLabel, defJpy, defLocal, curJpy: defJpy, curLocal: defLocal, color: '', size: '' };
+
+    // 顏色點選
     resultEl.querySelectorAll('.nissen-clr-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         resultEl.querySelectorAll('.nissen-clr-btn').forEach(b => b.style.borderColor = 'transparent');
         btn.style.borderColor = 'currentColor';
-        selectedColor = btn.dataset.value;
+        slotEl._nissen.color = btn.dataset.value;
+        nissenUpdatePrice_(slotEl, resultEl);
       });
     });
+    // 尺寸點選
     resultEl.querySelectorAll('.nissen-sz-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         resultEl.querySelectorAll('.nissen-sz-btn').forEach(b => b.style.borderColor = 'transparent');
         btn.style.borderColor = 'currentColor';
-        selectedSize = btn.dataset.value;
+        slotEl._nissen.size = btn.dataset.value;
+        nissenUpdatePrice_(slotEl, resultEl);
       });
     });
+    // 單商品複製
+    resultEl.querySelector('.nissen-copy-btn').addEventListener('click', async () => {
+      const d = slotEl._nissen;
+      const text = nissenSlotText_(d) + '\n\n請幫我代購~ 謝謝!✨';
+      await nissenCopy_(text, resultEl.querySelector('.nissen-copy-btn'), '📋 複製此商品');
+    });
 
-    // ── 複製按鈕
-    const copyBtn = resultEl.querySelector('.nissen-copy-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', async () => {
-        const text = `${url}\n款式/顏色：${selectedColor}\n尺寸：${selectedSize}\n日幣＆${localLabel}：${jpyStr || ''}${localStr ? ' / '+localStr : ''}\n\n請幫我代購~ 謝謝!✨`;
-        try { await navigator.clipboard.writeText(text); }
-        catch(_) {
-          const ta = Object.assign(document.createElement('textarea'), {value: text});
-          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
-        }
-        copyBtn.textContent = '✓ 已複製！';
-        setTimeout(() => { copyBtn.textContent = '📋 複製訂購資料'; }, 2000);
-      });
-    }
+    // 顯示「複製所有」按鈕
+    const allBtn = document.getElementById('nissenCopyAll' + region.toUpperCase());
+    if (allBtn) allBtn.style.display = '';
+
   } catch(e) {
     resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 查詢失敗：${e.message}</p>`;
   } finally {
     btnEl.disabled = false;
   }
+}
+
+function nissenUpdatePrice_(slotEl, resultEl) {
+  const d = slotEl._nissen;
+  let specificPrice = null;
+  if (d.size) {
+    const grp = d.color ? d.data.variants.find(v => v.group === d.color) : null;
+    for (const g of grp ? [grp] : d.data.variants) {
+      const opt = g.options.find(o => o.name === d.size && o.price);
+      if (opt) { specificPrice = opt.price; break; }
+    }
+  }
+  if (specificPrice) {
+    d.curJpy   = `¥${specificPrice.toLocaleString()}`;
+    d.curLocal = `${d.currency}${Math.ceil(specificPrice * d.rate).toLocaleString()}`;
+  } else {
+    d.curJpy   = d.defJpy;
+    d.curLocal = d.defLocal;
+  }
+  const jpyEl   = resultEl.querySelector('.nissen-jpy');
+  const localEl = resultEl.querySelector('.nissen-local');
+  if (jpyEl)   jpyEl.textContent   = d.curJpy   || '';
+  if (localEl) localEl.textContent = d.curLocal  || (specificPrice ? '' : d.defLocal || '');
+}
+
+function nissenSlotText_(d) {
+  const priceStr = (d.curJpy || '') + (d.curLocal ? ' / ' + d.curLocal : '');
+  return [
+    d.url,
+    d.name ? `商品：${d.name}` : '',
+    `款式/顏色：${d.color}`,
+    `尺寸：${d.size}`,
+    `日幣＆${d.localLabel}：${priceStr}`
+  ].filter(Boolean).join('\n');
+}
+
+async function nissenCopy_(text, btn, defaultLabel) {
+  try { await navigator.clipboard.writeText(text); }
+  catch(_) {
+    const ta = Object.assign(document.createElement('textarea'), {value: text});
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  if (btn) { btn.textContent = '✓ 已複製！'; setTimeout(() => { btn.textContent = defaultLabel; }, 2000); }
+}
+
+async function copyAllNissenSlots(region) {
+  const container = document.getElementById('nissenSlots' + region.toUpperCase());
+  const slots = [...container.querySelectorAll('.nissen-slot')].filter(s => s._nissen);
+  if (!slots.length) return;
+  const text = slots.map(s => nissenSlotText_(s._nissen)).join('\n\n') + '\n\n請幫我代購~ 謝謝!✨';
+  await nissenCopy_(text, document.getElementById('nissenCopyAll' + region.toUpperCase()), '📋 複製所有訂購資料');
 }
 
 loadData();
