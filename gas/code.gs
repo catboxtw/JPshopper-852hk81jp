@@ -738,11 +738,13 @@ function fetchNissenCampaign_() {
       var mAlt = /\salt=["']([^"']*)["']/i.exec(inner);
       var altText = mAlt ? mAlt[1].trim() : '';
 
+      // 翻譯日文 alt 文字為繁體中文
+      var nameZh = altText ? nissenTranslate_(altText.substring(0, 60)) : '';
       seen[imgSrc] = true;
       items.push({
         image:   imgSrc.substring(0, 250),
         url:     normalizeUrl_(href).substring(0, 250),
-        name:    altText.substring(0, 60),
+        name:    nameZh,
         hkPrice: '',
         twPrice: ''
       });
