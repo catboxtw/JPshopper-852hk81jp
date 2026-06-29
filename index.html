@@ -824,7 +824,7 @@ function renderNissenMarquee_(items) {
       const href  = it.url   || 'https://www.nissen.co.jp/';
       return `<a class="nissen-marquee-item" href="${href}" target="_blank" rel="noopener">${img}${label}</a>`;
     }).join('');
-    wrap.innerHTML = `<div class="nissen-marquee-outer"><div class="nissen-marquee-inner">${inner}</div></div>`;
+    wrap.innerHTML = `<p style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:5px;letter-spacing:0.5px;">🌸 人氣推介 &amp; 最新優惠</p><div class="nissen-marquee-outer"><div class="nissen-marquee-inner">${inner}</div></div>`;
     wrap.style.display = '';
     initNissenMarqueeScroll(wrap.querySelector('.nissen-marquee-outer'));
   });
