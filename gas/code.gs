@@ -341,6 +341,12 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "getNissenProduct") {
+    var nissenResult = fetchNissenProduct_(param.url || '');
+    return ContentService.createTextOutput(JSON.stringify(nissenResult))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 🛍️ 【分流 6】後台：讀取指定 event 的商品清單（含 stockLimit）
   if (action === "getProducts") {
     var sheetName = param.sheetName ? param.sheetName : "";
@@ -529,6 +535,151 @@ function doGet(e) {
     deadline: thisDeadline,
     orderedQty: orderedQty   // { "商品名|款式": 已購數量 }
   })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// =================================================================
+// Nissen 商品資料抓取
+// =================================================================
+function fetchNissenProduct_(url) {
+  if (!url || url.indexOf('nissen.co.jp') === -1) {
+    return { error: '請輸入有效的 Nissen 商品網址 (nissen.co.jp)' };
+  }
+  try {
+    var opts = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br'
+      },
+      muteHttpExceptions: true,
+      followRedirects: true
+    };
+    var resp = UrlFetchApp.fetch(url, opts);
+    var code = resp.getResponseCode();
+    if (code !== 200) {
+      return { error: '無法讀取商品頁面 (HTTP ' + code + ')。請確認網址是否正確。' };
+    }
+    var html = resp.getContentText('UTF-8');
+    var result = { name: '', price: null, variants: [], rawUrl: url };
+
+    // ── 1. 商品名稱 ──
+    var namePatterns = [
+      /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+      /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
+      /<h1[^>]*class="[^"]*(?:item[_-]?name|product[_-]?name|itemName)[^"]*"[^>]*>([\s\S]*?)<\/h1>/i,
+      /<h1[^>]*>([\s\S]*?)<\/h1>/i,
+      /<title[^>]*>([^<|｜【\-]+)/i
+    ];
+    for (var ni = 0; ni < namePatterns.length; ni++) {
+      var nm = html.match(namePatterns[ni]);
+      if (nm) {
+        var n = nm[1].replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&#[\d]+;/g,'').replace(/[\r\n\t]+/g,' ').trim();
+        if (n && n.length > 2) { result.name = n; break; }
+      }
+    }
+
+    // ── 2. 税込価格 ──
+    var pricePatterns = [
+      /<meta[^>]+property=["']product:price:amount["'][^>]+content=["'](\d+(?:\.\d+)?)["']/i,
+      /<meta[^>]+content=["'](\d+(?:\.\d+)?)["'][^>]+property=["']product:price:amount["']/i,
+      /税込(?:価格)?[^\d]*?(\d[\d,]+)\s*円/,
+      /(\d[\d,]+)\s*円[^\d]*?税込/,
+      /"price"\s*:\s*(\d+)/,
+      /class="[^"]*price[^"]*"[^>]*>\s*(?:[¥￥]|&yen;)?\s*([\d,]+)/i
+    ];
+    for (var pi = 0; pi < pricePatterns.length; pi++) {
+      var pm = html.match(pricePatterns[pi]);
+      if (pm) {
+        var p = parseInt(pm[1].replace(/[,，]/g, ''));
+        if (p > 0 && p < 9999999) { result.price = p; break; }
+      }
+    }
+
+    // ── 3. 款式／尺寸（從 <select> 和 JS 資料） ──
+    var variants = [];
+
+    // 3a. JSON-LD structured data
+    var jsonLdBlocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (var ji = 0; ji < jsonLdBlocks.length; ji++) {
+      try {
+        var jText = jsonLdBlocks[ji].replace(/<script[^>]*>|<\/script>/gi, '').trim();
+        var jData = JSON.parse(jText);
+        if (Array.isArray(jData)) { for (var k=0;k<jData.length;k++) { if (jData[k]['@type']==='Product'){jData=jData[k];break;} } }
+        if (jData['@type'] === 'Product') {
+          if (!result.name && jData.name) result.name = jData.name;
+          if (!result.price && jData.offers) {
+            var off = Array.isArray(jData.offers) ? jData.offers[0] : jData.offers;
+            if (off.price) result.price = parseInt(off.price);
+          }
+          if (jData.hasVariant || jData.variesBy) {
+            var vArr = jData.hasVariant || [];
+            if (vArr.length > 0) {
+              var jvOpts = vArr.map(function(v) {
+                var n2 = v.name || v.color || v.size || '';
+                var avail = !v.offers || (v.offers.availability && v.offers.availability.indexOf('InStock') !== -1);
+                return { name: n2, inStock: avail };
+              });
+              variants.push({ group: '款式', options: jvOpts });
+            }
+          }
+        }
+      } catch(e2) {}
+    }
+
+    // 3b. JS embedded arrays (colorSizeList / sizeList etc.)
+    if (variants.length === 0) {
+      var jsPatterns = [
+        /(?:colorSizeList|sizeList|colorList|itemVariants|skuList)\s*[=:]\s*(\[[\s\S]*?\]);/,
+        /"(?:sizes|colors|variants|skus|colorSizes)"\s*:\s*(\[[\s\S]{0,3000}?\])/
+      ];
+      for (var jp2 = 0; jp2 < jsPatterns.length; jp2++) {
+        var jm = html.match(jsPatterns[jp2]);
+        if (jm) {
+          try {
+            var arr = JSON.parse(jm[1]);
+            if (Array.isArray(arr) && arr.length > 0) {
+              var opts2 = arr.map(function(item) {
+                var n3 = item.name || item.colorName || item.sizeName || item.label || item.text || '';
+                var inS = !(item.soldOut || item.stockFlg === 0 || item.stock === 0 || item.disabled);
+                return { name: String(n3).trim(), inStock: inS };
+              }).filter(function(o){ return o.name; });
+              if (opts2.length > 0) { variants.push({ group: '款式', options: opts2 }); break; }
+            }
+          } catch(e3) {}
+        }
+      }
+    }
+
+    // 3c. <select> elements
+    if (variants.length === 0) {
+      var selBlocks = html.match(/<select[\s\S]*?<\/select>/gi) || [];
+      selBlocks.forEach(function(sel) {
+        var labelM = sel.match(/(?:id|name|aria-label)=["']([^"']+)["']/i);
+        var groupName = labelM ? labelM[1] : '選項';
+        var optTags = sel.match(/<option[\s\S]*?<\/option>/gi) || [];
+        if (optTags.length <= 1) return;
+        var selOpts = [];
+        optTags.forEach(function(opt) {
+          var valM2 = opt.match(/value=["']([^"']*)["']/i);
+          var val = valM2 ? valM2[1] : '';
+          if (!val || val === '' || val === '0' || val === '--' || val === '-1') return;
+          var txt = opt.replace(/<[^>]+>/g, '').replace(/&amp;/g,'&').trim();
+          if (!txt || /^[-－—]+$/.test(txt)) return;
+          var disabled = /disabled/i.test(opt);
+          var soldOut = /在庫なし|完売|品切れ|sold.?out/i.test(txt);
+          selOpts.push({ name: txt, inStock: !disabled && !soldOut });
+        });
+        if (selOpts.length > 0) variants.push({ group: groupName, options: selOpts });
+      });
+    }
+
+    result.variants = variants;
+    return result;
+
+  } catch(e) {
+    return { error: '抓取失敗：' + e.toString() };
+  }
 }
 
 // =================================================================

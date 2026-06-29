@@ -351,10 +351,56 @@
     <div class="section-line"></div>
   </div>
 
-  <div class="coming-soon">
-    <div class="cs-icon">🚧</div>
-    <div>即將推出，敬請期待！</div>
-    <div style="font-size:11px; margin-top:6px; color:#bbb;">Coming Soon</div>
+  <!-- HK: Nissen -->
+  <div class="service-card general hk-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✨ NISSEN 日本郵購長期代購</li>
+        <li>✨ 服飾、生活雜貨均可代購</li>
+        <li>✨ 商品直接由日本寄出</li>
+        <li>✨ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率：</strong>¥1 = HK$0.059（稅込価格換算）<br>
+        <strong>到港運費：</strong>HK$4.5／50g，另加 $10-$13 本地運費
+      </div>
+      <div style="margin-top:14px;">
+        <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="nissenUrlHK" type="url" placeholder="貼上 Nissen 商品網址..."
+            style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
+          <button onclick="fetchNissenQuote('hk')" id="nissenBtnHK"
+            style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
+        </div>
+        <div id="nissenResultHK"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TW: Nissen -->
+  <div class="service-card general tw-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✓ NISSEN 日本郵購長期代購</li>
+        <li>✓ 服飾、生活雜貨均可代購</li>
+        <li>✓ 商品直接由日本寄出</li>
+        <li>✓ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率：</strong>¥1 = NT$0.24（稅込価格換算）<br>
+        <strong>到台運費：</strong>NT$20／50g，另加 NT$38 賣貨便國內運費
+      </div>
+      <div style="margin-top:14px;">
+        <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="nissenUrlTW" type="url" placeholder="貼上 Nissen 商品網址..."
+            style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
+          <button onclick="fetchNissenQuote('tw')" id="nissenBtnTW"
+            style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
+        </div>
+        <div id="nissenResultTW"></div>
+      </div>
+    </div>
   </div>
 
 </main>
@@ -522,6 +568,81 @@ async function loadData() {
   renderDrawer();
   setInterval(renderCards, 60000);
 }
+
+// ── Nissen 即時報價 ──
+async function fetchNissenQuote(region) {
+  const inputEl = document.getElementById(region === 'hk' ? 'nissenUrlHK' : 'nissenUrlTW');
+  const resultEl = document.getElementById(region === 'hk' ? 'nissenResultHK' : 'nissenResultTW');
+  const btnEl = document.getElementById(region === 'hk' ? 'nissenBtnHK' : 'nissenBtnTW');
+  const url = inputEl.value.trim();
+  if (!url) { resultEl.innerHTML = '<p style="font-size:12px;color:#c62828;">請先貼上 Nissen 商品網址</p>'; return; }
+
+  btnEl.disabled = true;
+  resultEl.innerHTML = '<p style="font-size:12px;color:#888;">⏳ 查詢中，請稍候...</p>';
+
+  try {
+    const apiUrl = GAS_API_URL + '?action=getNissenProduct&url=' + encodeURIComponent(url);
+    const resp = await fetch(apiUrl);
+    const data = await resp.json();
+
+    if (data.error) {
+      resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`;
+      return;
+    }
+
+    const rate = region === 'hk' ? 0.059 : 0.24;
+    const currency = region === 'hk' ? 'HK$' : 'NT$';
+    const localPrice = data.price ? Math.ceil(data.price * rate) : null;
+
+    let html = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;">';
+
+    if (data.name) {
+      html += `<p style="font-weight:600;color:var(--ink);margin-bottom:8px;font-size:13px;line-height:1.5;">${data.name}</p>`;
+    }
+
+    if (data.price) {
+      html += '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap;">';
+      html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong>¥${data.price.toLocaleString()}</strong></span>`;
+      if (localPrice) {
+        html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${currency}${localPrice.toLocaleString()}</strong></span>`;
+      }
+      html += '</div>';
+    } else {
+      html += '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">（未能取得價格）</p>';
+    }
+
+    if (data.variants && data.variants.length > 0) {
+      data.variants.forEach(g => {
+        const label = /size|サイズ/i.test(g.group) ? '尺寸' : /color|カラー|色/i.test(g.group) ? '顏色' : '款式';
+        html += `<p style="font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase;">${label}</p>`;
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        g.options.forEach(opt => {
+          const bg = opt.inStock ? '#e8f5e9' : '#f5f5f5';
+          const color = opt.inStock ? '#2e7d32' : '#aaa';
+          const strike = opt.inStock ? '' : 'text-decoration:line-through;';
+          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${color};${strike}">${opt.name}</span>`;
+        });
+        html += '</div>';
+      });
+    } else {
+      html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
+    }
+
+    html += `<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>`;
+    html += '</div>';
+    resultEl.innerHTML = html;
+  } catch(e) {
+    resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 查詢失敗：${e.message}</p>`;
+  } finally {
+    btnEl.disabled = false;
+  }
+}
+
+// Enter key triggers query
+['nissenUrlHK','nissenUrlTW'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') fetchNissenQuote(id.includes('HK') ? 'hk' : 'tw'); });
+});
 
 loadData();
 </script>
