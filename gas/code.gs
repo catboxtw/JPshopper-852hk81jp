@@ -348,13 +348,24 @@ function doGet(e) {
   }
 
   if (action === "getNissenFeatured") {
-    // 優先從 Nissen 官網首頁抓取 campaign 橫幅
-    var campItems = fetchNissenCampaign_();
+    // 1. 讀取每日快取（最快，不佔 quota）
+    var campItems = getNissenCampaignCached_();
+    if (!campItems || campItems.length === 0) {
+      // 2. 快取為空（首次），即時抓取並同時寫入快取
+      campItems = fetchNissenCampaign_();
+      if (campItems && campItems.length > 0) {
+        try {
+          var props = PropertiesService.getScriptProperties();
+          props.setProperty('nissen_campaign_items',   JSON.stringify(campItems));
+          props.setProperty('nissen_campaign_updated', new Date().toISOString());
+        } catch(e) {}
+      }
+    }
     if (campItems && campItems.length > 0) {
       return ContentService.createTextOutput(JSON.stringify({ items: campItems }))
                            .setMimeType(ContentService.MimeType.JSON);
     }
-    // 備用：讀取「Nissen精選」試算表
+    // 3. 備用：讀取「Nissen精選」試算表
     var featSheet = ss.getSheetByName("Nissen精選");
     if (!featSheet) {
       return ContentService.createTextOutput(JSON.stringify({ items: [] }))
@@ -705,7 +716,7 @@ function fetchNissenCampaign_() {
     var reLink = /<a(?:\s[^>]*)?\shref=["']([^"']+)["'][^>]*>([\s\S]{0,3000}?)<\/a>/gi;
     var mL;
     while ((mL = reLink.exec(html)) !== null) {
-      if (items.length >= 30) break;
+      if (items.length >= 20) break;
       var href = mL[1].trim();
       if (href.indexOf('javascript') === 0 || href === '#' || href === '') continue;
 
@@ -729,18 +740,56 @@ function fetchNissenCampaign_() {
 
       seen[imgSrc] = true;
       items.push({
-        image:   imgSrc,
-        url:     normalizeUrl_(href),
-        name:    altText,
+        image:   imgSrc.substring(0, 250),
+        url:     normalizeUrl_(href).substring(0, 250),
+        name:    altText.substring(0, 60),
         hkPrice: '',
         twPrice: ''
       });
     }
 
-    return items;
+    return items.slice(0, 20);
   } catch(e) {
     return [];
   }
+}
+
+// 讀取 PropertiesService 快取
+function getNissenCampaignCached_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var cached = props.getProperty('nissen_campaign_items');
+    if (cached) return JSON.parse(cached);
+  } catch(e) {}
+  return null;
+}
+
+// 更新快取（每日 trigger 呼叫，或手動執行）
+function refreshNissenCampaignCache() {
+  var items = fetchNissenCampaign_();
+  if (items && items.length > 0) {
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('nissen_campaign_items',   JSON.stringify(items));
+    props.setProperty('nissen_campaign_updated', new Date().toISOString());
+    Logger.log('Nissen campaign cache updated: ' + items.length + ' items');
+  } else {
+    Logger.log('Nissen campaign: fetch returned empty, cache not updated.');
+  }
+}
+
+// 設定每日定時更新（只需運行一次）
+function setupNissenCampaignTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'refreshNissenCampaignCache') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('refreshNissenCampaignCache')
+    .timeBased()
+    .everyDays(1)
+    .atHour(3) // 每日凌晨 3 點（時區依 GAS 項目設定，建議設 Asia/Tokyo）
+    .create();
+  Logger.log('Daily trigger created for refreshNissenCampaignCache.');
 }
 
 // =================================================================
