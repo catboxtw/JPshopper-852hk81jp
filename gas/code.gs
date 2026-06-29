@@ -348,6 +348,13 @@ function doGet(e) {
   }
 
   if (action === "getNissenFeatured") {
+    // 優先從 Nissen 官網首頁抓取 campaign 橫幅
+    var campItems = fetchNissenCampaign_();
+    if (campItems && campItems.length > 0) {
+      return ContentService.createTextOutput(JSON.stringify({ items: campItems }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+    // 備用：讀取「Nissen精選」試算表
     var featSheet = ss.getSheetByName("Nissen精選");
     if (!featSheet) {
       return ContentService.createTextOutput(JSON.stringify({ items: [] }))
@@ -666,6 +673,74 @@ function nissenExtractArray_(html, varName) {
     if (c === ']') { if (--depth === 0) return html.substring(m.index + m[0].length - 1, i + 1); }
   }
   return null;
+}
+
+// 抓取 Nissen 官網首頁 campaign 橫幅
+function fetchNissenCampaign_() {
+  try {
+    var resp = UrlFetchApp.fetch('https://www.nissen.co.jp/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.5'
+      },
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (resp.getResponseCode() !== 200) return [];
+    var html = resp.getContentText('UTF-8');
+
+    var items = [], seen = {};
+
+    function normalizeUrl_(u) {
+      if (!u) return 'https://www.nissen.co.jp/';
+      u = u.trim();
+      if (u.indexOf('http') === 0) return u;
+      if (u.indexOf('//') === 0)   return 'https:' + u;
+      if (u.charAt(0) === '/')     return 'https://www.nissen.co.jp' + u;
+      return u;
+    }
+
+    // 策略: 搜尋 <a href="...">...<img src 或 data-src="...jpg/png/webp">...</a>
+    var reLink = /<a(?:\s[^>]*)?\shref=["']([^"']+)["'][^>]*>([\s\S]{0,3000}?)<\/a>/gi;
+    var mL;
+    while ((mL = reLink.exec(html)) !== null) {
+      if (items.length >= 30) break;
+      var href = mL[1].trim();
+      if (href.indexOf('javascript') === 0 || href === '#' || href === '') continue;
+
+      var inner = mL[2];
+      // 尋找帶有圖片副檔名的 src 或 data-src
+      var reImg = /\s(?:data-src|src)=["']([^"']+\.(?:jpg|jpeg|png|webp)(?:\?[^"']*)?)["']/i;
+      var mI = reImg.exec(inner);
+      if (!mI) continue;
+      var imgSrc = mI[1].trim();
+      if (!imgSrc || imgSrc.length < 8) continue;
+
+      // 過濾掉明顯的 icon/logo/common 小圖
+      if (/\/icon|\/logo|\/common\/|\/btn|\/arrow|\/parts\/|sprite|blank\.png|spacer/i.test(imgSrc)) continue;
+
+      imgSrc = normalizeUrl_(imgSrc);
+      if (seen[imgSrc]) continue;
+
+      // 取得 alt 文字
+      var mAlt = /\salt=["']([^"']*)["']/i.exec(inner);
+      var altText = mAlt ? mAlt[1].trim() : '';
+
+      seen[imgSrc] = true;
+      items.push({
+        image:   imgSrc,
+        url:     normalizeUrl_(href),
+        name:    altText,
+        hkPrice: '',
+        twPrice: ''
+      });
+    }
+
+    return items;
+  } catch(e) {
+    return [];
+  }
 }
 
 // =================================================================

@@ -793,14 +793,17 @@ async function loadNissenFeatured() {
     ['HK','TW'].forEach(reg => {
       const wrap = document.getElementById('nissenMarqueeWrap' + reg);
       if (!wrap) return;
-      const items = [...data.items, ...data.items]; // 複製一份讓捲動無縫
+      // 複製項目讓捲動無縫循環
+      const items = [...data.items, ...data.items];
+      // 速度根據項目數調整（每項約 3 秒）
+      const dur = Math.max(20, data.items.length * 3) + 's';
       const inner = items.map(it => {
-        const img = it.image ? `<img src="${it.image}" alt="" onerror="this.style.display='none'">` : '';
-        const price = reg === 'HK' ? (it.hkPrice ? ` (${it.hkPrice})` : '') : (it.twPrice ? ` (${it.twPrice})` : '');
-        const href = it.url || '#';
-        return `<a class="nissen-marquee-item" href="${href}" target="_blank">${img}<span>${it.name}${price}</span></a>`;
+        const img = it.image ? `<img src="${it.image}" alt="${it.name || ''}" onerror="this.style.display='none'">` : '';
+        const label = it.name ? `<span>${it.name}</span>` : '';
+        const href = it.url || 'https://www.nissen.co.jp/';
+        return `<a class="nissen-marquee-item" href="${href}" target="_blank" rel="noopener">${img}${label}</a>`;
       }).join('');
-      wrap.innerHTML = `<div class="nissen-marquee-outer"><div class="nissen-marquee-inner">${inner}</div></div>`;
+      wrap.innerHTML = `<div class="nissen-marquee-outer"><div class="nissen-marquee-inner" style="animation-duration:${dur}">${inner}</div></div>`;
       wrap.style.display = '';
     });
   } catch(e) {}
