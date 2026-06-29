@@ -347,6 +347,28 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "getNissenFeatured") {
+    var featSheet = ss.getSheetByName("Nissen精選");
+    if (!featSheet) {
+      return ContentService.createTextOutput(JSON.stringify({ items: [] }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+    var featRows = featSheet.getDataRange().getValues();
+    var featItems = [];
+    for (var fi = 1; fi < featRows.length; fi++) {
+      if (!featRows[fi][0] && !featRows[fi][2]) continue;
+      featItems.push({
+        name:    featRows[fi][0] ? featRows[fi][0].toString() : '',
+        image:   featRows[fi][1] ? featRows[fi][1].toString() : '',
+        url:     featRows[fi][2] ? featRows[fi][2].toString() : '',
+        hkPrice: featRows[fi][3] ? featRows[fi][3].toString() : '',
+        twPrice: featRows[fi][4] ? featRows[fi][4].toString() : ''
+      });
+    }
+    return ContentService.createTextOutput(JSON.stringify({ items: featItems }))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // 🛍️ 【分流 6】後台：讀取指定 event 的商品清單（含 stockLimit）
   if (action === "getProducts") {
     var sheetName = param.sheetName ? param.sheetName : "";
@@ -560,7 +582,7 @@ function fetchNissenProduct_(url) {
       return { error: '無法讀取商品頁面 (HTTP ' + code + ')。請確認網址是否正確。' };
     }
     var html = resp.getContentText('UTF-8');
-    var result = { name: '', price: null, priceMax: null, variants: [], rawUrl: url };
+    var result = { name: '', image: null, price: null, priceMax: null, variants: [], rawUrl: url };
 
     // 1. 商品名稱: var itemName = "..."
     var nameM = html.match(/var\s+itemName\s*=\s*"([^"]+)"/);
@@ -571,6 +593,11 @@ function fetchNissenProduct_(url) {
              || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
       if (ogM) result.name = ogM[1].trim();
     }
+
+    // 1b. 商品圖片: og:image
+    var imgM = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    if (imgM) result.image = imgM[1];
 
     // 2. 税込価格: var priceL = 最低価格, var price = 最高価格
     var pLM = html.match(/var\s+priceL\s*=\s*"(\d+)"/);
