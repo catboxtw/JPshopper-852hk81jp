@@ -785,27 +785,36 @@ async function copyAllNissenSlots(region) {
   await nissenCopy_(text, document.getElementById('nissenCopyAll' + region.toUpperCase()), '📋 複製所有訂購資料');
 }
 
+function renderNissenMarquee_(items) {
+  if (!items || !items.length) return;
+  const dur = Math.max(20, items.length * 3) + 's';
+  ['HK','TW'].forEach(reg => {
+    const wrap = document.getElementById('nissenMarqueeWrap' + reg);
+    if (!wrap) return;
+    const doubled = [...items, ...items]; // 複製讓捲動無縫
+    const inner = doubled.map(it => {
+      const img   = it.image ? `<img src="${it.image}" alt="${it.name || ''}" onerror="this.style.display='none'">` : '';
+      const label = it.name  ? `<span>${it.name}</span>` : '';
+      const href  = it.url   || 'https://www.nissen.co.jp/';
+      return `<a class="nissen-marquee-item" href="${href}" target="_blank" rel="noopener">${img}${label}</a>`;
+    }).join('');
+    wrap.innerHTML = `<div class="nissen-marquee-outer"><div class="nissen-marquee-inner" style="animation-duration:${dur}">${inner}</div></div>`;
+    wrap.style.display = '';
+  });
+}
+
 async function loadNissenFeatured() {
+  // 優先直讀 Supabase（最快，跳過 GAS 冷啟動）
+  try {
+    const rows = await sbGet('nissen_campaign?id=eq.1&select=items');
+    const items = rows && rows[0] && rows[0].items;
+    if (items && items.length) { renderNissenMarquee_(items); return; }
+  } catch(e) {}
+  // Fallback: 從 GAS 讀取（首次或 Supabase 空白時）
   try {
     const resp = await fetch(GAS_API_URL + '?action=getNissenFeatured');
     const data = await resp.json();
-    if (!data.items || !data.items.length) return;
-    ['HK','TW'].forEach(reg => {
-      const wrap = document.getElementById('nissenMarqueeWrap' + reg);
-      if (!wrap) return;
-      // 複製項目讓捲動無縫循環
-      const items = [...data.items, ...data.items];
-      // 速度根據項目數調整（每項約 3 秒）
-      const dur = Math.max(20, data.items.length * 3) + 's';
-      const inner = items.map(it => {
-        const img = it.image ? `<img src="${it.image}" alt="${it.name || ''}" onerror="this.style.display='none'">` : '';
-        const label = it.name ? `<span>${it.name}</span>` : '';
-        const href = it.url || 'https://www.nissen.co.jp/';
-        return `<a class="nissen-marquee-item" href="${href}" target="_blank" rel="noopener">${img}${label}</a>`;
-      }).join('');
-      wrap.innerHTML = `<div class="nissen-marquee-outer"><div class="nissen-marquee-inner" style="animation-duration:${dur}">${inner}</div></div>`;
-      wrap.style.display = '';
-    });
+    if (data.items && data.items.length) renderNissenMarquee_(data.items);
   } catch(e) {}
 }
 

@@ -767,14 +767,42 @@ function getNissenCampaignCached_() {
 // 更新快取（每日 trigger 呼叫，或手動執行）
 function refreshNissenCampaignCache() {
   var items = fetchNissenCampaign_();
-  if (items && items.length > 0) {
-    var props = PropertiesService.getScriptProperties();
-    props.setProperty('nissen_campaign_items',   JSON.stringify(items));
-    props.setProperty('nissen_campaign_updated', new Date().toISOString());
-    Logger.log('Nissen campaign cache updated: ' + items.length + ' items');
-  } else {
+  if (!items || items.length === 0) {
     Logger.log('Nissen campaign: fetch returned empty, cache not updated.');
+    return;
   }
+  var now = new Date().toISOString();
+  var props = PropertiesService.getScriptProperties();
+
+  // 1. 存入 PropertiesService（GAS fallback 用）
+  props.setProperty('nissen_campaign_items',   JSON.stringify(items));
+  props.setProperty('nissen_campaign_updated', now);
+
+  // 2. 存入 Supabase（前端直接讀，跳過 GAS 冷啟動）
+  var supaUrl        = 'https://pksqfpirggvsftvqrtji.supabase.co';
+  var supaServiceKey = props.getProperty('SUPA_SERVICE_KEY');
+  if (supaServiceKey) {
+    try {
+      var res = UrlFetchApp.fetch(supaUrl + '/rest/v1/nissen_campaign?id=eq.1', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type':  'application/json',
+          'apikey':        supaServiceKey,
+          'Authorization': 'Bearer ' + supaServiceKey,
+          'Prefer':        'return=minimal'
+        },
+        payload:           JSON.stringify({ items: items, updated_at: now }),
+        muteHttpExceptions: true
+      });
+      Logger.log('Supabase updated. HTTP ' + res.getResponseCode());
+    } catch(e) {
+      Logger.log('Supabase update failed: ' + e.message);
+    }
+  } else {
+    Logger.log('SUPA_SERVICE_KEY not set in PropertiesService — skipped Supabase write.');
+  }
+
+  Logger.log('Nissen campaign cache updated: ' + items.length + ' items');
 }
 
 // 設定每日定時更新（只需運行一次）
