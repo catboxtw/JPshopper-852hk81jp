@@ -369,8 +369,16 @@
         <div id="nissenSlotsHK"></div>
         <button onclick="addNissenSlot('hk')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
-        <button id="nissenCopyAllHK" onclick="copyAllNissenSlots('hk')"
-          style="display:none;margin-top:6px;padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;">📋 複製所有訂購資料</button>
+        <div id="nissenCopyAreaHK" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>
+          <button id="nissenCopyAllHK" onclick="copyAllNissenSlots('hk')"
+            style="padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;margin-bottom:10px;">📋 複製所有訂購資料</button>
+          <div class="service-contact-label" style="margin-bottom:4px;">🔗 聯絡店主</div>
+          <div class="service-contact">
+            <a class="contact-link" href="https://www.instagram.com/852hk.81jp/" target="_blank"><span>IG</span>@852hk.81jp</a>
+            <a class="contact-link" href="https://www.threads.com/@852hk.81jp" target="_blank"><span>Threads</span>@852hk.81jp</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -393,8 +401,16 @@
         <div id="nissenSlotsTW"></div>
         <button onclick="addNissenSlot('tw')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
-        <button id="nissenCopyAllTW" onclick="copyAllNissenSlots('tw')"
-          style="display:none;margin-top:6px;padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;">📋 複製所有訂購資料</button>
+        <div id="nissenCopyAreaTW" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+          <p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>
+          <button id="nissenCopyAllTW" onclick="copyAllNissenSlots('tw')"
+            style="padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;margin-bottom:10px;">📋 複製所有訂購資料</button>
+          <div class="service-contact-label" style="margin-bottom:4px;">🔗 聯絡店主</div>
+          <div class="service-contact">
+            <a class="contact-link" href="https://www.instagram.com/886tw.81jp/" target="_blank"><span>IG</span>@886tw.81jp</a>
+            <a class="contact-link" href="https://www.threads.com/@886tw.81jp" target="_blank"><span>Threads</span>@886tw.81jp</a>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -668,11 +684,7 @@ async function fetchNissenSlot(slotEl, region) {
       html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
     }
 
-    html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">';
-    html += `<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">${hasVariants ? '👆 點選顏色及尺寸後，' : ''}一鍵複製聯絡店主購買吧～</p>`;
-    html += '<button class="nissen-copy-btn" style="width:100%;padding:8px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">📋 複製此商品</button>';
-    html += '</div>';
-    html += '<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>';
+    html += '<p style="font-size:10px;color:#bbb;margin-top:8px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準｜翻譯可能有誤</p>';
     html += '</div>';
     resultEl.innerHTML = html;
 
@@ -697,16 +709,9 @@ async function fetchNissenSlot(slotEl, region) {
         nissenUpdatePrice_(slotEl, resultEl);
       });
     });
-    // 單商品複製
-    resultEl.querySelector('.nissen-copy-btn').addEventListener('click', async () => {
-      const d = slotEl._nissen;
-      const text = nissenSlotText_(d) + '\n\n請幫我代購~ 謝謝!✨';
-      await nissenCopy_(text, resultEl.querySelector('.nissen-copy-btn'), '📋 複製此商品');
-    });
-
-    // 顯示「複製所有」按鈕
-    const allBtn = document.getElementById('nissenCopyAll' + region.toUpperCase());
-    if (allBtn) allBtn.style.display = '';
+    // 顯示「複製所有」區域
+    const copyArea = document.getElementById('nissenCopyArea' + region.toUpperCase());
+    if (copyArea) copyArea.style.display = '';
 
   } catch(e) {
     resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 查詢失敗：${e.message}</p>`;
