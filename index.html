@@ -355,9 +355,9 @@
   <div class="service-card general hk-only">
     <div class="service-card-inner">
       <ul class="service-points">
-        <li>✨ NISSEN 日本郵購長期代購</li>
+        <li>✨ NISSEN 日本長期代購</li>
         <li>✨ 服飾、生活雜貨均可代購</li>
-        <li>✨ 商品直接由日本寄出</li>
+        <li>✨ 商品每兩星期由日本寄出，到港後用 順豐到付 / 郵局易寄取 +$10至$13 / 平郵實報實銷 寄出</li>
         <li>✨ 國際運費只收實重，無體積重</li>
       </ul>
       <div class="service-rate">
@@ -366,13 +366,9 @@
       </div>
       <div style="margin-top:14px;">
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input id="nissenUrlHK" type="url" placeholder="貼上 Nissen 商品網址..."
-            style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
-          <button onclick="fetchNissenQuote('hk')" id="nissenBtnHK"
-            style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
-        </div>
-        <div id="nissenResultHK"></div>
+        <div id="nissenSlotsHK"></div>
+        <button onclick="addNissenSlot('hk')"
+          style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
       </div>
     </div>
   </div>
@@ -381,9 +377,9 @@
   <div class="service-card general tw-only">
     <div class="service-card-inner">
       <ul class="service-points">
-        <li>✓ NISSEN 日本郵購長期代購</li>
+        <li>✓ NISSEN 日本長期代購</li>
         <li>✓ 服飾、生活雜貨均可代購</li>
-        <li>✓ 商品直接由日本寄出</li>
+        <li>✓ 商品每月從日本寄出，到台後以賣貨便收取國際運費，加國內運費 NT$38 寄出</li>
         <li>✓ 國際運費只收實重，無體積重</li>
       </ul>
       <div class="service-rate">
@@ -392,13 +388,9 @@
       </div>
       <div style="margin-top:14px;">
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
-        <div style="display:flex;gap:8px;margin-bottom:8px;">
-          <input id="nissenUrlTW" type="url" placeholder="貼上 Nissen 商品網址..."
-            style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
-          <button onclick="fetchNissenQuote('tw')" id="nissenBtnTW"
-            style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
-        </div>
-        <div id="nissenResultTW"></div>
+        <div id="nissenSlotsTW"></div>
+        <button onclick="addNissenSlot('tw')"
+          style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
       </div>
     </div>
   </div>
@@ -570,10 +562,36 @@ async function loadData() {
 }
 
 // ── Nissen 即時報價 ──
-async function fetchNissenQuote(region) {
-  const inputEl = document.getElementById(region === 'hk' ? 'nissenUrlHK' : 'nissenUrlTW');
-  const resultEl = document.getElementById(region === 'hk' ? 'nissenResultHK' : 'nissenResultTW');
-  const btnEl = document.getElementById(region === 'hk' ? 'nissenBtnHK' : 'nissenBtnTW');
+function addNissenSlot(region) {
+  const container = document.getElementById('nissenSlots' + region.toUpperCase());
+  const idx = container.querySelectorAll('.nissen-slot').length;
+  const div = document.createElement('div');
+  div.className = 'nissen-slot';
+  div.style.marginBottom = '10px';
+  div.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      ${idx > 0 ? `<span style="font-size:11px;color:var(--muted);flex-shrink:0;">商品${idx+1}</span>` : ''}
+      <input type="url" class="nissen-url" placeholder="貼上 Nissen 商品網址..."
+        style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
+      <button class="nissen-query-btn"
+        style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
+      ${idx > 0 ? `<button class="nissen-remove-btn" style="padding:6px 10px;background:none;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);">✕</button>` : ''}
+    </div>
+    <div class="nissen-result"></div>
+  `;
+  const input = div.querySelector('.nissen-url');
+  const qBtn  = div.querySelector('.nissen-query-btn');
+  const rBtn  = div.querySelector('.nissen-remove-btn');
+  qBtn.addEventListener('click', () => fetchNissenSlot(div, region));
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') fetchNissenSlot(div, region); });
+  if (rBtn) rBtn.addEventListener('click', () => div.remove());
+  container.appendChild(div);
+}
+
+async function fetchNissenSlot(slotEl, region) {
+  const inputEl  = slotEl.querySelector('.nissen-url');
+  const resultEl = slotEl.querySelector('.nissen-result');
+  const btnEl    = slotEl.querySelector('.nissen-query-btn');
   const url = inputEl.value.trim();
   if (!url) { resultEl.innerHTML = '<p style="font-size:12px;color:#c62828;">請先貼上 Nissen 商品網址</p>'; return; }
 
@@ -585,57 +603,90 @@ async function fetchNissenQuote(region) {
     const resp = await fetch(apiUrl);
     const data = await resp.json();
 
-    if (data.error) {
-      resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`;
-      return;
-    }
+    if (data.error) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`; return; }
 
-    const rate = region === 'hk' ? 0.059 : 0.24;
-    const currency = region === 'hk' ? 'HK$' : 'NT$';
+    const rate      = region === 'hk' ? 0.059 : 0.24;
+    const currency  = region === 'hk' ? 'HK$' : 'NT$';
     const localPrice = data.price ? Math.ceil(data.price * rate) : null;
+    const jpyStr    = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
+    const localStr  = localPrice ? `${currency}${localPrice.toLocaleString()}起` : null;
 
     let html = '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:6px;">';
 
-    if (data.name) {
-      html += `<p style="font-weight:600;color:var(--ink);margin-bottom:8px;font-size:13px;line-height:1.5;">${data.name}</p>`;
-    }
+    if (data.name) html += `<p style="font-weight:600;color:var(--ink);margin-bottom:8px;font-size:13px;line-height:1.5;">${data.name}</p>`;
 
-    if (data.price) {
-      const jpyStr = data.priceMax
-        ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}`
-        : `¥${data.price.toLocaleString()}`;
+    if (jpyStr) {
       html += '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap;">';
       html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong>${jpyStr}</strong></span>`;
-      if (localPrice) {
-        html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${currency}${localPrice.toLocaleString()}起</strong></span>`;
-      }
+      if (localStr) html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${localStr}</strong></span>`;
       html += '</div>';
     } else {
       html += '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">（未能取得價格）</p>';
     }
 
     if (data.variants && data.variants.length > 0) {
-      data.variants.forEach(g => {
-        html += `<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">${g.group}</p>`;
+      // 顏色
+      const hasColors = data.variants.length > 1 || data.variants[0].group !== '';
+      if (hasColors) {
+        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">顏色</p>';
         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
-        g.options.forEach(opt => {
-          const isReserve = opt.reserve;
-          const bg    = isReserve ? '#fff3e0' : (opt.inStock ? '#e8f5e9' : '#f5f5f5');
-          const color = isReserve ? '#e65100' : (opt.inStock ? '#2e7d32' : '#aaa');
-          const strike = (!opt.inStock && !isReserve) ? 'text-decoration:line-through;' : '';
-          const label = isReserve ? opt.name + '(予約)' : opt.name;
-          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${color};${strike}">${label}</span>`;
+        data.variants.forEach(g => {
+          const anyIn  = g.options.some(o => o.inStock && !o.reserve);
+          const anyRes = !anyIn && g.options.some(o => o.reserve);
+          const bg  = anyRes ? '#fff3e0' : (anyIn ? '#e8f5e9' : '#f5f5f5');
+          const clr = anyRes ? '#e65100' : (anyIn ? '#2e7d32' : '#aaa');
+          const sk  = (!anyIn && !anyRes) ? 'text-decoration:line-through;' : '';
+          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${clr};${sk}">${anyRes ? g.group+'(予約)' : g.group}</span>`;
         });
         html += '</div>';
-      });
-      html += '<p style="font-size:10px;color:#999;margin-top:2px;">※ 下單時庫存狀況可能有所變動。</p>';
+      }
+      // 尺寸（各顏色合併）
+      const sizeMap = {}, sizeOrder = [];
+      data.variants.forEach(g => g.options.forEach(o => {
+        if (!sizeMap[o.name]) { sizeMap[o.name] = {inStock:false, reserve:false}; sizeOrder.push(o.name); }
+        if (o.inStock && !o.reserve) sizeMap[o.name].inStock = true;
+        if (o.reserve) sizeMap[o.name].reserve = true;
+      }));
+      if (sizeOrder.length > 0) {
+        html += '<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">尺寸</p>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
+        sizeOrder.forEach(n => {
+          const s  = sizeMap[n];
+          const bg  = s.reserve ? '#fff3e0' : (s.inStock ? '#e8f5e9' : '#f5f5f5');
+          const clr = s.reserve ? '#e65100' : (s.inStock ? '#2e7d32' : '#aaa');
+          const sk  = (!s.inStock && !s.reserve) ? 'text-decoration:line-through;' : '';
+          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${clr};${sk}">${s.reserve ? n+'(予約)' : n}</span>`;
+        });
+        html += '</div>';
+      }
+      html += '<p style="font-size:10px;color:#999;margin-top:2px;margin-bottom:8px;">※ 下單時庫存狀況可能有所變動。</p>';
     } else {
       html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
     }
 
-    html += `<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>`;
+    // 一鍵複製
+    const localLabel = region === 'hk' ? '港幣' : '台幣';
+    const copyText = `${url}\n款式/顏色：\n尺寸：\n日幣＆${localLabel}：${jpyStr || ''}${localStr ? ' / '+localStr : ''}\n\n請幫我代購~ 謝謝!✨`;
+    html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">';
+    html += '<p style="font-size:10px;color:var(--muted);margin-bottom:6px;">一鍵複製聯絡店主購買吧～</p>';
+    html += '<button class="nissen-copy-btn" style="width:100%;padding:8px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;">📋 複製訂購資料</button>';
+    html += '</div>';
+    html += '<p style="font-size:10px;color:#bbb;margin-top:6px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準</p>';
     html += '</div>';
     resultEl.innerHTML = html;
+
+    const copyBtn = resultEl.querySelector('.nissen-copy-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(copyText); }
+        catch(_) {
+          const ta = Object.assign(document.createElement('textarea'), {value: copyText});
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+        }
+        copyBtn.textContent = '✓ 已複製！';
+        setTimeout(() => { copyBtn.textContent = '📋 複製訂購資料'; }, 2000);
+      });
+    }
   } catch(e) {
     resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 查詢失敗：${e.message}</p>`;
   } finally {
@@ -643,13 +694,9 @@ async function fetchNissenQuote(region) {
   }
 }
 
-// Enter key triggers query
-['nissenUrlHK','nissenUrlTW'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') fetchNissenQuote(id.includes('HK') ? 'hk' : 'tw'); });
-});
-
 loadData();
+addNissenSlot('hk');
+addNissenSlot('tw');
 </script>
 </body>
 </html>
