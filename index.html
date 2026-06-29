@@ -601,10 +601,13 @@ async function fetchNissenQuote(region) {
     }
 
     if (data.price) {
+      const jpyStr = data.priceMax
+        ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}`
+        : `¥${data.price.toLocaleString()}`;
       html += '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap;">';
-      html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong>¥${data.price.toLocaleString()}</strong></span>`;
+      html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong>${jpyStr}</strong></span>`;
       if (localPrice) {
-        html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${currency}${localPrice.toLocaleString()}</strong></span>`;
+        html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong>${currency}${localPrice.toLocaleString()}起</strong></span>`;
       }
       html += '</div>';
     } else {
@@ -613,17 +616,19 @@ async function fetchNissenQuote(region) {
 
     if (data.variants && data.variants.length > 0) {
       data.variants.forEach(g => {
-        const label = /size|サイズ/i.test(g.group) ? '尺寸' : /color|カラー|色/i.test(g.group) ? '顏色' : '款式';
-        html += `<p style="font-size:10px;color:var(--muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase;">${label}</p>`;
+        html += `<p style="font-size:10px;color:var(--muted);margin-bottom:4px;font-weight:600;">${g.group}</p>`;
         html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;">';
         g.options.forEach(opt => {
-          const bg = opt.inStock ? '#e8f5e9' : '#f5f5f5';
-          const color = opt.inStock ? '#2e7d32' : '#aaa';
-          const strike = opt.inStock ? '' : 'text-decoration:line-through;';
-          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${color};${strike}">${opt.name}</span>`;
+          const isReserve = opt.reserve;
+          const bg    = isReserve ? '#fff3e0' : (opt.inStock ? '#e8f5e9' : '#f5f5f5');
+          const color = isReserve ? '#e65100' : (opt.inStock ? '#2e7d32' : '#aaa');
+          const strike = (!opt.inStock && !isReserve) ? 'text-decoration:line-through;' : '';
+          const label = isReserve ? opt.name + '(予約)' : opt.name;
+          html += `<span style="font-size:11px;padding:3px 9px;border-radius:12px;background:${bg};color:${color};${strike}">${label}</span>`;
         });
         html += '</div>';
       });
+      html += '<p style="font-size:10px;color:#999;margin-top:2px;">※ 下單時庫存狀況可能有所變動。</p>';
     } else {
       html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
     }
