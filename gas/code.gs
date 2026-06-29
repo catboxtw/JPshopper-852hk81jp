@@ -2900,11 +2900,45 @@ function savePurchased(ss, eventName, items) {
   var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy/MM/dd");
   sheet.getRange(1, batchCol).setNumberFormat("@").setValue(today);
 
+  // 從 event sheet 取日幣單價
+  var yenMap = {};
+  var eventSheet = getSheetByEventName(ss, eventName);
+  if (eventSheet) {
+    var eRows = eventSheet.getDataRange().getValues();
+    for (var er = 1; er < eRows.length; er++) {
+      var en = eRows[er][0] ? eRows[er][0].toString().trim() : "";
+      if (en) yenMap[en] = parseFloat(eRows[er][2]) || 0;
+    }
+  }
+
+  // 從訂單紀錄統計 paidQty 和 unpaidQty
+  var paidMap = {}, unpaidMap = {};
+  var cleanEventName = stripEndPrefix(eventName);
+  var orderSheet = ss.getSheetByName("訂單紀錄");
+  if (orderSheet) {
+    var oRows = orderSheet.getDataRange().getValues();
+    for (var oi = 1; oi < oRows.length; oi++) {
+      if (!oRows[oi][0]) continue;
+      var rowEvent  = oRows[oi][2] ? oRows[oi][2].toString().trim() : "";
+      var rowStatus = oRows[oi][15] ? oRows[oi][15].toString().trim() : "";
+      if (rowEvent !== cleanEventName) continue;
+      if (rowStatus === "已取消") continue;
+      var isPaid = (rowStatus === "已收款" || rowStatus === "已付款");
+      var parsed = parseSummaryItems(oRows[oi][3] ? oRows[oi][3].toString() : "");
+      for (var pk = 0; pk < parsed.length; pk++) {
+        var pkey = parsed[pk].name + "|" + parsed[pk].sub;
+        if (isPaid) paidMap[pkey] = (paidMap[pkey] || 0) + parsed[pk].qty;
+        else unpaidMap[pkey] = (unpaidMap[pkey] || 0) + parsed[pk].qty;
+      }
+    }
+  }
+
   for (var k = 0; k < items.length; k++) {
     var item = items[k];
     if (!item.purchased || item.purchased <= 0) continue;
     var itemSub  = item.sub  ? item.sub.toString().trim()  : "";
     var itemName = item.name ? item.name.toString().trim() : "";
+    var mapKey = itemName + "|" + itemSub;
     var found = false;
 
     for (var r = 1; r < rows.length; r++) {
@@ -2916,13 +2950,21 @@ function savePurchased(ss, eventName, items) {
         sheet.getRange(r + 1, 6).setValue(curBought + item.purchased); // F=col6
         sheet.getRange(r + 1, batchCol).setValue(item.purchased);       // 批次欄
         rows[r][5] = curBought + item.purchased;
+        // 補齊日幣單價（若 C 欄為空）
+        if (!rows[r][2] && yenMap[itemName]) {
+          sheet.getRange(r + 1, 3).setValue(yenMap[itemName]);
+          rows[r][2] = yenMap[itemName];
+        }
         found = true;
         break;
       }
     }
     if (!found) {
       // 新增行：A=名稱, B=款式, C=日幣, D=已付款, E=未付款, F=已購買, G=已結算
-      var newRow = [itemName, itemSub, "", "", "", item.purchased, ""];
+      var yenEach   = yenMap[itemName]   || 0;
+      var paidQty   = paidMap[mapKey]    || 0;
+      var unpaidQty = unpaidMap[mapKey]  || 0;
+      var newRow = [itemName, itemSub, yenEach, paidQty, unpaidQty, item.purchased, ""];
       while (newRow.length < batchCol - 1) newRow.push("");
       newRow.push(item.purchased);
       sheet.appendRow(newRow);
