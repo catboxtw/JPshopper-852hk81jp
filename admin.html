@@ -1238,7 +1238,7 @@ async function init() {
   // 載入已購買數量（用於訂單頁面的欠貨顯示）
   fetch(GAS + '?action=getPurchasedQty')
     .then(r => r.json())
-    .then(data => { purchasedQtyMap = data || {}; renderAllOrders(); })
+    .then(data => { purchasedQtyMap = data || {}; owedMapCache = {}; renderAllOrders(); })
     .catch(e => console.warn('purchasedQtyMap 載入失敗:', e));
 }
 
@@ -2331,11 +2331,12 @@ function renderOrderSummary() {
     const card = document.createElement('div');
     card.className = 'oscard';
 
-    // ── 圖片：逐一嘗試每個款式直到找到有效 URL ──
+    // ── 圖片：逐一嘗試每個款式直到找到有效 URL，再 fallback 到 globalPhotoMap ──
     let imgSrc = fallback;
     for (const sub of product.subs) {
       if (sub.photo && sub.photo.startsWith('http')) { imgSrc = sub.photo; break; }
     }
+    if (imgSrc === fallback && globalPhotoMap[product.name]) imgSrc = globalPhotoMap[product.name];
 
     // 計算此商品「還需購買」的日幣（排除已完成的款式）
     const prodRemainingYen = product.subs
@@ -2725,6 +2726,7 @@ function applyPurchaseFilter() {
     for (const sub of product.subs) {
       if (sub.photo && sub.photo.startsWith('http')) { imgSrc = sub.photo; break; }
     }
+    if (imgSrc === fallback && globalPhotoMap[product.name]) imgSrc = globalPhotoMap[product.name];
 
     const prodYen = visibleSubs.reduce((s, sub) => {
       const key = product.name + '|' + sub.sub;
