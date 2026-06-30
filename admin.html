@@ -1729,6 +1729,26 @@ function parseSummaryFrontend(text) {
     part = part.trim();
     let qty = 1, sub = '';
 
+    // ── 新格式 A：末尾 {款式} [xN] — shop-hk/tw.html 提交格式 ──
+    // e.g. "CREAM Vintage Tee (White) {XXL} [x1]"
+    const fmtNew = part.match(/\{([^}]*)\}\s*\[x(\d+)\]\s*$/i);
+    if (fmtNew) {
+      sub = fmtNew[1].trim();
+      qty = parseInt(fmtNew[2]) || 1;
+      part = part.slice(0, part.lastIndexOf('{')).trim();
+      items.push({ name: part, sub, qty });
+      return;
+    }
+    // ── 新格式 B：末尾 [xN]（無款式）──
+    // e.g. "某商品 [x2]"
+    const fmtNewQty = part.match(/\[x(\d+)\]\s*$/i);
+    if (fmtNewQty) {
+      qty = parseInt(fmtNewQty[1]) || 1;
+      part = part.slice(0, part.lastIndexOf('[x')).trim();
+      items.push({ name: part, sub: '', qty });
+      return;
+    }
+
     // ── 格式 A：末尾 (SIZE xN) — 款式和數量在同一括號 ──
     // e.g. "CREAM Vintage Tee (White) (XXL x1)"
     const fmtA = part.match(/\(([^)]+?)\s+[xX×]\s*(\d+)\s*\)\s*$/);
