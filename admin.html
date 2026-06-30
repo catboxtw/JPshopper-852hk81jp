@@ -1263,9 +1263,10 @@ function computeOwedMap(orders, eventName) {
     .slice()
     .sort((a, b) => parsePayTime(a.paymentTime) - parsePayTime(b.paymentTime));
 
-  // 從 purchasedQtyMap 取得庫存（deep copy）
+  // 從 purchasedQtyMap 取得庫存（deep copy）；活動名稱可能帶 [END] 前綴，需要兩者都查
   const inventory = {};
-  const eventPurchased = purchasedQtyMap[eventName] || {};
+  const cleanEvName = eventName.replace(/^\[END\]\s*/i, '');
+  const eventPurchased = purchasedQtyMap[eventName] || purchasedQtyMap[cleanEvName] || {};
   for (const key in eventPurchased) {
     inventory[key] = eventPurchased[key] || 0;
   }
@@ -1462,6 +1463,13 @@ function fetchOrders() {
       // 建立 orderId → summary 快取供缺貨通知使用
       window._orderSummaryMap = {};
       [...hk, ...tw].forEach(o => { window._orderSummaryMap[o.id] = o.summary || ''; });
+      // 建立全局圖片對照表供買貨區使用
+      globalPhotoMap = {};
+      [...hk, ...tw].forEach(order => {
+        (order.productPhotos || []).forEach(p => {
+          if (p.photo && p.photo.startsWith('http')) globalPhotoMap[p.name] = p.photo;
+        });
+      });
       applyFilter('hk');
       applyFilter('tw');
     })
@@ -2137,6 +2145,13 @@ function savePurchasedChanges() {
     fetch(GAS, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'savePurchased', eventName: currentPurchaseEvent, items: gasItems })
     }).catch(e => console.warn('GAS sync:', e));
+
+    // 3. 更新本地 purchasedQtyMap，清除欠貨快取，令訂單頁重算欠x
+    if (!purchasedQtyMap[cleanEv]) purchasedQtyMap[cleanEv] = {};
+    gasItems.forEach(item => {
+      purchasedQtyMap[cleanEv][item.name + '|' + (item.sub || '')] = item.purchased;
+    });
+    owedMapCache = {};
 
     purchaseChanges = {};
     btn.innerText = '💾 確認儲存'; btn.disabled = false;
