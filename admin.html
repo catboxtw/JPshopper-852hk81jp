@@ -696,6 +696,11 @@
       <div class="nav-item" onclick="goto('products'); closeSidebar();" id="nav-products">
         <span class="nav-icon">🛍️</span> 上架商品
       </div>
+
+      <div class="nav-section-label">現貨管理</div>
+      <div class="nav-item" onclick="goto('flash'); closeSidebar();" id="nav-flash">
+        <span class="nav-icon">⚡</span> 現貨搶購
+      </div>
     </nav>
     <div class="sidebar-footer">852hk.81jp © 2025</div>
   </aside>
@@ -1075,6 +1080,80 @@
         </div>
       </div>
 
+      <!-- ════ PAGE: 現貨搶購 ════ -->
+      <div class="page" id="page-flash">
+
+        <!-- 新增 / 編輯表單 -->
+        <div class="card" id="flashFormCard">
+          <div style="font-weight:700; font-size:15px; margin-bottom:14px;">⚡ 現貨商品</div>
+          <input type="hidden" id="flashEditId">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">商品名稱 *</label>
+              <input type="text" id="flashName" placeholder="例：Nike Air Max 1" oninput="autoSlug()" style="font-size:15px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">URL slug *</label>
+              <input type="text" id="flashSlug" placeholder="例：nike-air-max-1" style="font-size:15px;">
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="form-label">商品描述</label>
+            <input type="text" id="flashDesc" placeholder="例：US10 / 黑色" style="font-size:14px;">
+          </div>
+          <div class="form-field">
+            <label class="form-label">圖片網址</label>
+            <input type="text" id="flashImg" placeholder="https://..." oninput="previewFlashImg()" style="font-size:13px;">
+            <div id="flashImgPreview" style="width:80px;height:80px;background:#f0f0f0;border-radius:8px;border:1px solid #ddd;overflow:hidden;margin-top:8px;display:none;">
+              <img id="flashImgTag" style="width:100%;height:100%;object-fit:cover;">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">港幣售價 (HK$)</label>
+              <input type="number" id="flashPriceHkd" placeholder="0" style="font-size:15px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">台幣售價 (NT$)</label>
+              <input type="number" id="flashPriceTwd" placeholder="0" style="font-size:15px;">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">日幣成本 (¥)</label>
+              <input type="number" id="flashPriceJpy" placeholder="0" style="font-size:15px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">庫存數量</label>
+              <input type="number" id="flashQty" placeholder="1" min="1" value="1" style="font-size:15px;">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn btn-blue" style="flex:1; padding:10px;" onclick="saveFlashItem()">💾 儲存商品</button>
+            <button class="btn" style="padding:10px 16px;" onclick="clearFlashForm()">✕ 清除</button>
+          </div>
+        </div>
+
+        <!-- 現貨商品列表 -->
+        <div class="card" id="flashItemsCard" style="margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:15px;">商品列表</div>
+            <button class="btn btn-blue" style="font-size:13px;padding:6px 14px;" onclick="loadFlashItems()">🔄 重新整理</button>
+          </div>
+          <div id="flashItemsList"><div style="color:var(--muted);font-size:14px;">載入中…</div></div>
+        </div>
+
+        <!-- 訂單面板（顯示當前商品的訂單） -->
+        <div class="card" id="flashOrdersCard" style="display:none;margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:15px;" id="flashOrdersTitle">訂單</div>
+            <button class="btn" style="font-size:13px;padding:6px 14px;" onclick="document.getElementById('flashOrdersCard').style.display='none'">✕ 關閉</button>
+          </div>
+          <div id="flashOrdersList"><div style="color:var(--muted);font-size:14px;">載入中…</div></div>
+        </div>
+
+      </div><!-- /page-flash -->
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /adminApp -->
@@ -1333,7 +1412,7 @@ async function loadSheetList() {
 }
 
 // ── Navigation ──
-const pageTitles = { orders:'所有訂單', picking:'執貨清單', refund:'退款區', stock:'庫存管理', purchase:'買貨區', settle:'結算區', profit:'盈利計算', events:'建立活動', products:'上架商品' };
+const pageTitles = { orders:'所有訂單', picking:'執貨清單', refund:'退款區', stock:'庫存管理', purchase:'買貨區', settle:'結算區', profit:'盈利計算', events:'建立活動', products:'上架商品', flash:'現貨搶購' };
 function goto(page) {
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1360,6 +1439,8 @@ function goto(page) {
     const hasSettle = Object.keys(settleChanges).length > 0;
     if (hasSettle) floatEl.className = 'float-save visible';
   }
+  // 現貨搶購載入
+  if (page === 'flash') loadFlashItems();
 }
 function handleRefresh() { fetchOrders(); }
 
@@ -4792,7 +4873,311 @@ async function syncAllEventsToSupabase() {
     document.body.appendChild(script);
   });
 }
-  
+
+// ══════════════════════════════════════════════════
+// ⚡ 現貨搶購管理
+// ══════════════════════════════════════════════════
+
+let flashItems = [];
+
+async function loadFlashItems() {
+  document.getElementById('flashItemsList').innerHTML = '<div style="color:var(--muted);font-size:14px;">載入中…</div>';
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/flash_stock?select=*&order=created_at.desc', { headers: SUPA_H });
+    flashItems = await res.json();
+    renderFlashItemList();
+  } catch(e) {
+    document.getElementById('flashItemsList').innerHTML = '<div style="color:red;font-size:13px;">載入失敗：' + e.message + '</div>';
+  }
+}
+
+function renderFlashItemList() {
+  const el = document.getElementById('flashItemsList');
+  if (!flashItems.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:14px;">尚無商品，請用上方表單新增。</div>';
+    return;
+  }
+  el.innerHTML = flashItems.map(item => {
+    const statusBadge = {
+      active: '<span style="background:#d1fae5;color:#065f46;border-radius:20px;padding:2px 10px;font-size:11px;">上架中</span>',
+      sold_out: '<span style="background:#fee2e2;color:#991b1b;border-radius:20px;padding:2px 10px;font-size:11px;">已售完</span>',
+      hidden: '<span style="background:#f3f4f6;color:#6b7280;border-radius:20px;padding:2px 10px;font-size:11px;">隱藏</span>',
+    }[item.status] || '';
+    const flashUrl = '/flash/' + item.slug;
+    const imgHtml = item.image_url
+      ? `<img src="${item.image_url}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #eee;" onerror="this.style.display='none'">`
+      : `<div style="width:48px;height:48px;background:#f3f4f6;border-radius:6px;border:1px solid #eee;display:flex;align-items:center;justify-content:center;font-size:18px;">⚡</div>`;
+    return `
+      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          ${imgHtml}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:14px;">${item.name} ${statusBadge}</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">${item.description || ''}</div>
+            <div style="font-size:12px;margin-top:4px;">
+              HK$${item.price_hkd || 0} / NT$${item.price_twd || 0} / ¥${item.price_jpy || 0}
+            </div>
+            <div style="font-size:12px;margin-top:2px;">
+              庫存：<b>${item.qty_available}</b> / ${item.qty_total}
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px;word-break:break-all;">${flashUrl}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="copyFlashUrl('${item.slug}')">🔗 複製連結</button>
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="viewFlashOrders(${item.id},'${item.name.replace(/'/g,"\\'")}')">📋 查看訂單</button>
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="editFlashItem(${item.id})">✏️ 編輯</button>
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="restockFlashItem(${item.id})">🔄 補貨</button>
+          ${item.status === 'active'
+            ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#dc2626;" onclick="setFlashStatus(${item.id},'hidden')">🙈 隱藏</button>`
+            : `<button class="btn btn-blue" style="font-size:12px;padding:4px 10px;" onclick="setFlashStatus(${item.id},'active')">👁 上架</button>`
+          }
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function viewFlashOrders(itemId, itemName) {
+  const card = document.getElementById('flashOrdersCard');
+  const list = document.getElementById('flashOrdersList');
+  document.getElementById('flashOrdersTitle').textContent = '訂單：' + itemName;
+  card.style.display = '';
+  list.innerHTML = '<div style="color:var(--muted);font-size:14px;">載入中…</div>';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/flash_orders?item_id=eq.' + itemId + '&select=*&order=claimed_at.desc', { headers: SUPA_H });
+    const orders = await res.json();
+    if (!orders.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:14px;">尚無訂單</div>';
+      return;
+    }
+    const statusLabel = { claimed:'已搶到', submitted:'已填資料', paid:'已付款', cancelled:'已取消' };
+    const statusColor = { claimed:'#f59e0b', submitted:'#3b82f6', paid:'#10b981', cancelled:'#ef4444' };
+    list.innerHTML = orders.map(o => {
+      const st = statusLabel[o.status] || o.status;
+      const color = statusColor[o.status] || '#6b7280';
+      return `
+        <div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fafafa;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+            <div>
+              <span style="font-size:13px;font-weight:600;">${o.customer_name || '(未填)'}</span>
+              <span style="font-size:11px;color:${color};margin-left:8px;font-weight:600;">${st}</span>
+              <span style="font-size:11px;color:#94a3b8;margin-left:6px;">${o.region?.toUpperCase()}</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              ${o.status !== 'paid' && o.status !== 'cancelled'
+                ? `<button class="btn btn-blue" style="font-size:11px;padding:3px 8px;" onclick="markFlashPaid('${o.token}')">✅ 標記已付</button>`
+                : ''}
+              ${o.status !== 'cancelled'
+                ? `<button class="btn" style="font-size:11px;padding:3px 8px;color:#dc2626;" onclick="cancelFlashOrder('${o.token}',${itemId},'${itemName.replace(/'/g,"\\'")}')">✕ 取消</button>`
+                : ''}
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;">
+            📞 ${o.phone || '—'} &nbsp; ✉️ ${o.email || '—'} &nbsp; 💳 ${o.pay_method || '—'}
+          </div>
+          ${o.remark ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;">備注：${o.remark}</div>` : ''}
+          <div style="font-size:10px;color:#cbd5e1;margin-top:4px;">token: ${o.token}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:red;font-size:13px;">載入失敗：' + e.message + '</div>';
+  }
+}
+
+function autoSlug() {
+  const name = document.getElementById('flashName').value;
+  const slugEl = document.getElementById('flashSlug');
+  if (!slugEl.dataset.manual) {
+    slugEl.value = name.toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .trim()
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-');
+  }
+}
+
+function previewFlashImg() {
+  const url = document.getElementById('flashImg').value.trim();
+  const preview = document.getElementById('flashImgPreview');
+  const img = document.getElementById('flashImgTag');
+  if (url) { img.src = url; preview.style.display = ''; }
+  else { preview.style.display = 'none'; }
+}
+
+function clearFlashForm() {
+  document.getElementById('flashEditId').value = '';
+  document.getElementById('flashName').value = '';
+  document.getElementById('flashSlug').value = '';
+  document.getElementById('flashSlug').dataset.manual = '';
+  document.getElementById('flashDesc').value = '';
+  document.getElementById('flashImg').value = '';
+  document.getElementById('flashImgPreview').style.display = 'none';
+  document.getElementById('flashPriceHkd').value = '';
+  document.getElementById('flashPriceTwd').value = '';
+  document.getElementById('flashPriceJpy').value = '';
+  document.getElementById('flashQty').value = '1';
+}
+
+function editFlashItem(id) {
+  const item = flashItems.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('flashEditId').value = id;
+  document.getElementById('flashName').value = item.name;
+  document.getElementById('flashSlug').value = item.slug;
+  document.getElementById('flashSlug').dataset.manual = '1';
+  document.getElementById('flashDesc').value = item.description || '';
+  document.getElementById('flashImg').value = item.image_url || '';
+  previewFlashImg();
+  document.getElementById('flashPriceHkd').value = item.price_hkd || '';
+  document.getElementById('flashPriceTwd').value = item.price_twd || '';
+  document.getElementById('flashPriceJpy').value = item.price_jpy || '';
+  document.getElementById('flashQty').value = item.qty_total || 1;
+  document.getElementById('flashFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveFlashItem() {
+  const editId = document.getElementById('flashEditId').value;
+  const name = document.getElementById('flashName').value.trim();
+  const slug = document.getElementById('flashSlug').value.trim().toLowerCase();
+  if (!name || !slug) { alert('請填寫商品名稱和 slug'); return; }
+  const qty = parseInt(document.getElementById('flashQty').value) || 1;
+  const payload = {
+    name,
+    slug,
+    description: document.getElementById('flashDesc').value.trim(),
+    image_url: document.getElementById('flashImg').value.trim(),
+    price_hkd: parseFloat(document.getElementById('flashPriceHkd').value) || 0,
+    price_twd: parseFloat(document.getElementById('flashPriceTwd').value) || 0,
+    price_jpy: parseFloat(document.getElementById('flashPriceJpy').value) || 0,
+    qty_total: qty,
+    qty_available: qty,
+    status: 'active',
+    updated_at: new Date().toISOString(),
+  };
+  try {
+    let res;
+    if (editId) {
+      res = await fetch(SUPA_URL + '/rest/v1/flash_stock?id=eq.' + editId, {
+        method: 'PATCH',
+        headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ ...payload, qty_available: undefined }),
+      });
+    } else {
+      res = await fetch(SUPA_URL + '/rest/v1/flash_stock', {
+        method: 'POST',
+        headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+        body: JSON.stringify(payload),
+      });
+    }
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
+    clearFlashForm();
+    await loadFlashItems();
+    alert(editId ? '已更新商品！' : '已新增商品！');
+  } catch(e) {
+    alert('儲存失敗：' + e.message);
+  }
+}
+
+async function restockFlashItem(id) {
+  const item = flashItems.find(i => i.id === id);
+  if (!item) return;
+  const newQty = prompt('輸入新增庫存數量（目前：' + item.qty_available + ' / ' + item.qty_total + '）：');
+  if (!newQty || isNaN(parseInt(newQty))) return;
+  const add = parseInt(newQty);
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/flash_stock?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        qty_total: item.qty_total + add,
+        qty_available: item.qty_available + add,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await loadFlashItems();
+  } catch(e) {
+    alert('補貨失敗：' + e.message);
+  }
+}
+
+async function setFlashStatus(id, status) {
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/flash_stock?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    await loadFlashItems();
+  } catch(e) {
+    alert('更新失敗：' + e.message);
+  }
+}
+
+async function markFlashPaid(token) {
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/flash_orders?token=eq.' + token, {
+      method: 'PATCH',
+      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    // 重新載入訂單面板
+    const card = document.getElementById('flashOrdersCard');
+    if (card.style.display !== 'none') {
+      const title = document.getElementById('flashOrdersTitle').textContent.replace('訂單：', '');
+      const item = flashItems.find(i => i.name === title);
+      if (item) viewFlashOrders(item.id, item.name);
+    }
+  } catch(e) {
+    alert('更新失敗：' + e.message);
+  }
+}
+
+async function cancelFlashOrder(token, itemId, itemName) {
+  if (!confirm('確認取消此訂單？庫存將退回。')) return;
+  try {
+    // 取消訂單
+    const r1 = await fetch(SUPA_URL + '/rest/v1/flash_orders?token=eq.' + token, {
+      method: 'PATCH',
+      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'cancelled' }),
+    });
+    if (!r1.ok) throw new Error(await r1.text());
+    // 退回庫存（+1，若已售完則改回 active）
+    const item = flashItems.find(i => i.id === itemId);
+    if (item) {
+      const newAvail = (item.qty_available || 0) + 1;
+      const r2 = await fetch(SUPA_URL + '/rest/v1/flash_stock?id=eq.' + itemId, {
+        method: 'PATCH',
+        headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          qty_available: newAvail,
+          status: newAvail > 0 ? 'active' : item.status,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+      if (!r2.ok) throw new Error(await r2.text());
+    }
+    await loadFlashItems();
+    viewFlashOrders(itemId, itemName);
+  } catch(e) {
+    alert('取消失敗：' + e.message);
+  }
+}
+
+function copyFlashUrl(slug) {
+  const url = location.origin + '/flash/' + slug;
+  navigator.clipboard.writeText(url).then(() => alert('已複製：' + url)).catch(() => alert(url));
+}
+
+document.getElementById('flashSlug').addEventListener('input', function() {
+  this.dataset.manual = this.value ? '1' : '';
+});
+
 </script>
 </body>
 </html>
