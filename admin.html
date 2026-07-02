@@ -994,6 +994,11 @@
             <label class="form-label">新分頁名稱</label>
             <input type="text" id="newEventName" placeholder="例如：0801 popup Tokyo">
           </div>
+          <div class="form-field">
+            <label class="form-label">截止時間（選填）</label>
+            <input type="datetime-local" id="newEventDeadline" style="font-size:14px; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg); color:var(--ink); width:100%;">
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">設定後會自動寫入 Google Sheet「收單截止時間」分頁</div>
+          </div>
           <button class="btn btn-dark" style="width:100%; margin-top:4px;" onclick="createNewEvent()">複製 Blank 建立新分頁</button>
           <p style="font-size:11px; color:var(--muted); margin-top:10px;">建立後請至 Google 試算表確認新分頁，並填入商品資料。</p>
         </div>
@@ -3069,14 +3074,27 @@ function updatePurchaseFloatSave() {
 function createNewEvent() {
   const name = document.getElementById('newEventName').value.trim();
   if (!name) return alert('請輸入分頁名稱！');
+  const dlRaw = document.getElementById('newEventDeadline').value; // YYYY-MM-DDTHH:MM
+  const deadline = dlRaw ? dlRaw.replace('T', ' ').replace(/-/g, '/') : ''; // → YYYY/MM/DD HH:MM
   if (!confirm(`確定要建立新分頁【${name}】嗎？`)) return;
   fetch(GAS, {
     method: 'POST', mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'createNewEventSheet', newSheetName: name })
   }).then(() => {
+    const tasks = [];
+    if (deadline) {
+      tasks.push(fetch(GAS, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setDeadline', eventName: name, deadline })
+      }));
+    }
+    return Promise.all(tasks);
+  }).then(() => {
     alert('🎉 建立指令已發出！請稍後至 Google 試算表確認。');
     document.getElementById('newEventName').value = '';
+    document.getElementById('newEventDeadline').value = '';
   }).catch(err => alert('錯誤：' + err));
 }
 
