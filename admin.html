@@ -1020,7 +1020,7 @@
 
       <div class="page" id="page-products">
         <div class="card" style="max-width: 680px;">
-          <div class="card-title"><span>🛍️</span> 遠端上架新商品</div>
+          <div class="card-title" id="prodFormTitle"><span>🛍️</span> 遠端上架新商品</div>
 
           <div class="form-field">
             <label class="form-label">目標活動分頁</label>
@@ -1028,6 +1028,7 @@
               <div style="color:#bbb; font-size:13px;">載入中...</div>
             </div>
             <input type="hidden" id="prodTargetSheet">
+            <input type="hidden" id="prodEditRow" value="">
           </div>
 
           <div class="form-grid" style="margin-top:14px;">
@@ -1090,7 +1091,19 @@
             </div>
           </div>
 
-          <button class="btn btn-blue" style="width:100%; padding:10px; margin-top:8px;" onclick="addNewProduct()">🚀 發布上架新商品</button>
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button class="btn btn-blue" id="prodSubmitBtn" style="flex:1; padding:10px;" onclick="submitProductForm()">🚀 發布上架新商品</button>
+            <button class="btn" id="prodCancelBtn" style="padding:10px; display:none;" onclick="cancelProdEdit()">✕ 取消</button>
+          </div>
+        </div>
+
+        <!-- 目前商品列表 -->
+        <div class="card" id="prodListCard" style="max-width:680px; display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="font-weight:700; font-size:15px;">目前商品</div>
+            <div id="prodListCount" style="font-size:12px; color:var(--muted);"></div>
+          </div>
+          <div id="prodListWrap"></div>
         </div>
       </div>
 
@@ -1560,7 +1573,7 @@ function renderEventTabs(containerId, mode) {
       wrap.querySelectorAll('.event-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       if (mode === 'stock')    loadProducts(name);
-      if (mode === 'product')  document.getElementById('prodTargetSheet').value = name;
+      if (mode === 'product')  { document.getElementById('prodTargetSheet').value = name; cancelProdEdit(); loadExistingProducts(name); }
       if (mode === 'purchase') loadOrderSummary(name);
       if (mode === 'settle')   loadSettleData(name);
       if (mode === 'profit')   loadProfitData(name);
@@ -3158,36 +3171,134 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-function addNewProduct() {
-  const targetSheet = document.getElementById('prodTargetSheet').value.trim();
-  const p_name = document.getElementById('prodName').value.trim();
-  const p_price = document.getElementById('prodPrice').value.trim();
-  const p_photo = document.getElementById('prodPhoto').value.trim();
-  if (!targetSheet) return alert('請先選擇目標活動分頁！');
-  if (!p_name || !p_price || !p_photo) return alert('請填寫商品名稱、港幣售價、圖片網址！');
+function _collectProdFields() {
+  return {
+    targetSheet: document.getElementById('prodTargetSheet').value.trim(),
+    p_name:  document.getElementById('prodName').value.trim(),
+    p_sub:   document.getElementById('prodSub').value.trim(),
+    p_yen:   document.getElementById('prodYen').value || 0,
+    p_cost:  document.getElementById('prodCost').value || 0,
+    p_price: document.getElementById('prodPrice').value.trim(),
+    p_twd:   document.getElementById('prodTwd').value || 0,
+    p_weight: document.getElementById('prodWeight').value || 0,
+    p_stockLimit: document.getElementById('prodStockLimit').value || '',
+    p_photo: document.getElementById('prodPhoto').value.trim(),
+    p_quote: '',
+  };
+}
+
+function _clearProdForm() {
+  ['prodName','prodSub','prodYen','prodCost','prodPrice','prodTwd','prodWeight','prodStockLimit','prodPhoto'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el._manualEdit = false; }
+  });
+  document.getElementById('prodPhotoPreview').innerHTML = '預覽';
+  document.getElementById('prodPhotoBtn').innerText = '📷 從相簿選擇';
+  document.getElementById('prodEditRow').value = '';
+}
+
+function submitProductForm() {
+  const editRow = document.getElementById('prodEditRow').value;
+  if (editRow) {
+    _doUpdateProduct(parseInt(editRow));
+  } else {
+    _doAddNewProduct();
+  }
+}
+
+function _doAddNewProduct() {
+  const f = _collectProdFields();
+  if (!f.targetSheet) return alert('請先選擇目標活動分頁！');
+  if (!f.p_name || !f.p_price || !f.p_photo) return alert('請填寫商品名稱、港幣售價、圖片網址！');
   fetch(GAS, {
     method: 'POST', mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'addNewProduct', targetSheet,
-      p_name, p_sub: document.getElementById('prodSub').value.trim(),
-      p_yen: document.getElementById('prodYen').value || 0,
-      p_cost: document.getElementById('prodCost').value || 0,
-      p_price, p_twd: document.getElementById('prodTwd').value || 0,
-      p_weight: document.getElementById('prodWeight').value || 0,
-      p_stockLimit: document.getElementById('prodStockLimit').value || '',
-      p_photo, p_weight: 0, p_quote: ''
-    })
+    body: JSON.stringify({ action: 'addNewProduct', ...f })
   }).then(() => {
-    alert(`🎉 商品【${p_name}】已上架到【${targetSheet}】！`);
-    ['prodName','prodSub','prodYen','prodCost','prodPrice','prodTwd','prodWeight','prodStockLimit','prodPhoto'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) { el.value = ''; el._manualEdit = false; }
-    });
-    document.getElementById('prodPhotoPreview').innerHTML = '預覽';
-    document.getElementById('prodPhotoBtn').innerText = '📷 從相簿選擇';
+    alert(`🎉 商品【${f.p_name}】已上架到【${f.targetSheet}】！`);
+    _clearProdForm();
+    loadExistingProducts(f.targetSheet);
   }).catch(err => alert('錯誤：' + err));
 }
+
+function _doUpdateProduct(rowNum) {
+  const f = _collectProdFields();
+  if (!f.targetSheet) return alert('請先選擇目標活動分頁！');
+  if (!f.p_name || !f.p_price || !f.p_photo) return alert('請填寫商品名稱、港幣售價、圖片網址！');
+  if (!confirm(`確定要更新商品【${f.p_name}】嗎？`)) return;
+  fetch(GAS, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'updateProduct', rowNum, ...f })
+  }).then(() => {
+    alert(`✅ 商品【${f.p_name}】已更新！`);
+    cancelProdEdit();
+    loadExistingProducts(f.targetSheet);
+  }).catch(err => alert('錯誤：' + err));
+}
+
+function cancelProdEdit() {
+  _clearProdForm();
+  document.getElementById('prodFormTitle').innerHTML = '<span>🛍️</span> 遠端上架新商品';
+  document.getElementById('prodSubmitBtn').textContent = '🚀 發布上架新商品';
+  document.getElementById('prodCancelBtn').style.display = 'none';
+}
+
+function loadExistingProducts(sheetName) {
+  const card = document.getElementById('prodListCard');
+  const wrap = document.getElementById('prodListWrap');
+  card.style.display = '';
+  wrap.innerHTML = '<div style="color:#bbb;font-size:13px;padding:10px 0;">載入中…</div>';
+  fetch(GAS + '?action=getProducts&sheetName=' + encodeURIComponent(sheetName))
+    .then(r => r.json())
+    .then(data => {
+      const products = data.products || [];
+      document.getElementById('prodListCount').textContent = `${products.length} 件商品`;
+      if (!products.length) { wrap.innerHTML = '<div style="color:#bbb;font-size:13px;padding:10px 0;">此分頁尚無商品</div>'; return; }
+      wrap.innerHTML = products.map(p => {
+        const stockText = p.subStockLimit ? Object.entries(p.subStockLimit).map(([k,v])=>`${k}:${v}`).join(', ') : (p.subStockLimit === null ? '' : '');
+        return `
+        <div class="prod-edit-row" data-row="${p.row}" style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);">
+          <div style="width:44px;height:44px;flex-shrink:0;border-radius:6px;overflow:hidden;background:#f0f0f0;border:1px solid var(--border);">
+            ${p.photo ? `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">` : ''}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${p.name}</div>
+            ${p.subs ? `<div style="font-size:11px;color:var(--muted);">${p.subs}</div>` : ''}
+            <div style="font-size:11px;color:var(--muted);">HK$${p.price}${p.twd ? ` / NT$${p.twd}` : ''}${p.yen ? ` / ¥${p.yen}` : ''}${stockText ? ` · 限 ${stockText}` : ''}</div>
+          </div>
+          <button class="btn" style="padding:5px 12px;font-size:12px;flex-shrink:0;" onclick="editExistingProduct(${p.row},'${encodeURIComponent(JSON.stringify(p))}')">✏️ 編輯</button>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => { wrap.innerHTML = '<div style="color:#c62828;font-size:13px;">載入失敗</div>'; });
+}
+
+function editExistingProduct(rowNum, encodedJson) {
+  const p = JSON.parse(decodeURIComponent(encodedJson));
+  document.getElementById('prodEditRow').value = rowNum;
+  document.getElementById('prodName').value  = p.name  || '';
+  document.getElementById('prodSub').value   = p.subs  || '';
+  document.getElementById('prodYen').value   = p.yen   || '';
+  document.getElementById('prodWeight').value= p.weight|| '';
+  document.getElementById('prodCost').value  = p.cost  || '';
+  document.getElementById('prodPrice').value = p.price || '';
+  document.getElementById('prodTwd').value   = p.twd   || '';
+  document.getElementById('prodStockLimit').value = (p.subStockLimit && typeof p.subStockLimit === 'object')
+    ? Object.entries(p.subStockLimit).map(([k,v])=>`${k}:${v}`).join(' / ') : '';
+  document.getElementById('prodPhoto').value = p.photo || '';
+  if (p.photo) {
+    document.getElementById('prodPhotoPreview').innerHTML = `<img src="${p.photo}" style="width:100%;height:100%;object-fit:cover;">`;
+    document.getElementById('prodPhotoBtn').innerText = '📷 更換圖片';
+  }
+  document.getElementById('prodFormTitle').innerHTML = `<span>✏️</span> 編輯商品（第 ${rowNum} 行）`;
+  document.getElementById('prodSubmitBtn').textContent = '💾 儲存更改';
+  document.getElementById('prodCancelBtn').style.display = '';
+  document.getElementById('page-products').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 保留向下相容（舊的按鈕 onclick="addNewProduct()" 不存在了，但以防萬一）
+function addNewProduct() { submitProductForm(); }
 
 function pad(n) { return n < 10 ? '0' + n : n; }
 

@@ -410,9 +410,13 @@ function doGet(e) {
         name: pRows[pi][0] ? pRows[pi][0].toString() : "",
         subs: subsRaw,
         subsArray: subsRaw.split(" / ").map(function(s){ return s.trim(); }),
+        yen: parseFloat(pRows[pi][2]) || 0,
+        cost: parseFloat(pRows[pi][3]) || 0,
         price: parseFloat(pRows[pi][4]) || 0,
-        twd: parseFloat(pRows[pi][8]) || 0,
         photo: pRows[pi][5] ? pRows[pi][5].toString() : "",
+        weight: parseFloat(pRows[pi][6]) || 0,
+        quote: pRows[pi][7] ? pRows[pi][7].toString() : "",
+        twd: parseFloat(pRows[pi][8]) || 0,
         subStockLimit: parseSubStockLimit(rawLmt)  // { 款式: 庫存 } 或 null
       });
     }
@@ -920,6 +924,32 @@ function doPost(e) {
         parseFloat(rowData.p_twd)   || 0,
         rowData.p_stockLimit || ""
       ]);
+      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── 功能 4b：更新現有商品 ─────────────────────────────────────────
+    if (rowData.action === "updateProduct") {
+      var uSheet = ss.getSheetByName(rowData.targetSheet) || ss.getSheetByName(stripEndPrefix(rowData.targetSheet));
+      if (!uSheet) {
+        return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "找不到指定的商品分頁" })).setMimeType(ContentService.MimeType.JSON);
+      }
+      var rowNum = parseInt(rowData.rowNum);
+      if (!rowNum || rowNum < 2) {
+        return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "無效的 rowNum" })).setMimeType(ContentService.MimeType.JSON);
+      }
+      // A=名稱 B=款式 C=日幣 D=成本HKD E=售價HKD F=圖片 G=重量g H=備註 I=台幣 J=限購
+      uSheet.getRange(rowNum, 1, 1, 10).setValues([[
+        rowData.p_name  || "",
+        rowData.p_sub   || "",
+        parseFloat(rowData.p_yen)   || 0,
+        parseFloat(rowData.p_cost)  || 0,
+        parseFloat(rowData.p_price) || 0,
+        rowData.p_photo || "",
+        parseFloat(rowData.p_weight) || 0,
+        rowData.p_quote || "",
+        parseFloat(rowData.p_twd)   || 0,
+        rowData.p_stockLimit || ""
+      ]]);
       return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
     }
 
