@@ -1129,11 +1129,12 @@
             <input type="text" id="flashDesc" placeholder="例：US10 / 黑色" style="font-size:14px;">
           </div>
           <div class="form-field">
-            <label class="form-label">圖片網址</label>
-            <input type="text" id="flashImg" placeholder="https://..." oninput="previewFlashImg()" style="font-size:13px;">
-            <div id="flashImgPreview" style="width:80px;height:80px;background:#f0f0f0;border-radius:8px;border:1px solid #ddd;overflow:hidden;margin-top:8px;display:none;">
-              <img id="flashImgTag" style="width:100%;height:100%;object-fit:cover;">
+            <label class="form-label">商品圖片</label>
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+              <button type="button" class="btn" id="flashPhotoBtn" onclick="flashUploadPhoto()" style="padding:8px 16px;white-space:nowrap;">📷 上傳圖片</button>
+              <div id="flashImgPreview" style="width:56px;height:56px;background:#f0f0f0;border-radius:8px;border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#bbb;flex-shrink:0;">預覽</div>
             </div>
+            <input type="text" id="flashImg" placeholder="或直接填圖片網址…" oninput="previewFlashImg()" style="font-size:13px;">
           </div>
           <div class="form-grid">
             <div class="form-field">
@@ -1202,11 +1203,12 @@
             <input type="url" id="recUrl" placeholder="https://www.nissen.co.jp/..." style="font-size:13px;">
           </div>
           <div class="form-field">
-            <label class="form-label">商品圖片網址</label>
-            <input type="url" id="recImg" placeholder="https://..." oninput="previewRecImg()" style="font-size:13px;">
-            <div id="recImgPreview" style="display:none;margin-top:6px;">
-              <img id="recImgTag" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
+            <label class="form-label">商品圖片</label>
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
+              <button type="button" class="btn" id="recPhotoBtn" onclick="recUploadPhoto()" style="padding:8px 16px;white-space:nowrap;">📷 上傳圖片</button>
+              <div id="recImgPreview" style="width:56px;height:56px;background:#f0f0f0;border-radius:8px;border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#bbb;flex-shrink:0;">預覽</div>
             </div>
+            <input type="url" id="recImg" placeholder="或直接填圖片網址…" oninput="previewRecImg()" style="font-size:13px;">
           </div>
           <div class="form-grid">
             <div class="form-field">
@@ -5109,15 +5111,15 @@ function renderRecProductList() {
 function previewRecImg() {
   const url = document.getElementById('recImg').value.trim();
   const prev = document.getElementById('recImgPreview');
-  const img  = document.getElementById('recImgTag');
-  if (url) { img.src = url; prev.style.display = ''; }
-  else { prev.style.display = 'none'; }
+  if (url) { prev.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`; }
+  else { prev.innerHTML = '預覽'; }
 }
 
 function clearRecForm() {
   ['recEditId','recName','recDesc','recUrl','recImg','recPriceHkd','recPriceTwd','recPriceJpy'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('recSort').value = '0';
-  document.getElementById('recImgPreview').style.display = 'none';
+  document.getElementById('recImgPreview').innerHTML = '預覽';
+  document.getElementById('recPhotoBtn').innerText = '📷 上傳圖片';
 }
 
 function editRecProduct(id) {
@@ -5133,7 +5135,41 @@ function editRecProduct(id) {
   document.getElementById('recPriceJpy').value = p.price_jpy || '';
   document.getElementById('recSort').value    = p.sort_order  || 0;
   previewRecImg();
+  if (p.image_url) document.getElementById('recPhotoBtn').innerText = '📷 更換圖片';
   document.getElementById('nissenRecFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function recUploadPhoto() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+  document.body.appendChild(input);
+  input.onchange = async function(e) {
+    document.body.removeChild(input);
+    var file = e.target.files[0];
+    if (!file) return;
+    var btn = document.getElementById('recPhotoBtn');
+    btn.innerText = '⏳ 上傳中…'; btn.disabled = true;
+    try {
+      var timestamp = Math.round(Date.now() / 1000);
+      var sigStr = 'timestamp=' + timestamp + CLOUDINARY_SECRET;
+      var signature = await sha1(sigStr);
+      var fd = new FormData();
+      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
+      fd.append('timestamp', timestamp); fd.append('signature', signature);
+      var res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
+      var data = await res.json();
+      if (data.secure_url) {
+        var url = data.secure_url.replace(/\.[^.]+$/, '.jpg');
+        document.getElementById('recImg').value = url;
+        document.getElementById('recImgPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+        btn.innerText = '✅ 已上傳';
+      } else { btn.innerText = '❌ 失敗'; }
+    } catch(err) { btn.innerText = '❌ 錯誤'; console.error(err); }
+    btn.disabled = false;
+  };
+  input.click();
 }
 
 async function saveRecProduct() {
@@ -5482,9 +5518,8 @@ function autoSlug() {
 function previewFlashImg() {
   const url = document.getElementById('flashImg').value.trim();
   const preview = document.getElementById('flashImgPreview');
-  const img = document.getElementById('flashImgTag');
-  if (url) { img.src = url; preview.style.display = ''; }
-  else { preview.style.display = 'none'; }
+  if (url) { preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`; }
+  else { preview.innerHTML = '預覽'; }
 }
 
 function clearFlashForm() {
@@ -5494,7 +5529,8 @@ function clearFlashForm() {
   document.getElementById('flashSlug').dataset.manual = '';
   document.getElementById('flashDesc').value = '';
   document.getElementById('flashImg').value = '';
-  document.getElementById('flashImgPreview').style.display = 'none';
+  document.getElementById('flashImgPreview').innerHTML = '預覽';
+  document.getElementById('flashPhotoBtn').innerText = '📷 上傳圖片';
   document.getElementById('flashPriceHkd').value = '';
   document.getElementById('flashPriceTwd').value = '';
   document.getElementById('flashPriceJpy').value = '';
@@ -5511,11 +5547,42 @@ function editFlashItem(id) {
   document.getElementById('flashDesc').value = item.description || '';
   document.getElementById('flashImg').value = item.image_url || '';
   previewFlashImg();
+  if (item.image_url) document.getElementById('flashPhotoBtn').innerText = '📷 更換圖片';
   document.getElementById('flashPriceHkd').value = item.price_hkd || '';
   document.getElementById('flashPriceTwd').value = item.price_twd || '';
   document.getElementById('flashPriceJpy').value = item.price_jpy || '';
   document.getElementById('flashQty').value = item.qty_total || 1;
   document.getElementById('flashFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function flashUploadPhoto() {
+  var input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+  document.body.appendChild(input);
+  input.onchange = async function(e) {
+    document.body.removeChild(input);
+    var file = e.target.files[0]; if (!file) return;
+    var btn = document.getElementById('flashPhotoBtn');
+    btn.innerText = '⏳ 上傳中…'; btn.disabled = true;
+    try {
+      var timestamp = Math.round(Date.now() / 1000);
+      var signature = await sha1('timestamp=' + timestamp + CLOUDINARY_SECRET);
+      var fd = new FormData();
+      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
+      fd.append('timestamp', timestamp); fd.append('signature', signature);
+      var res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
+      var data = await res.json();
+      if (data.secure_url) {
+        var url = data.secure_url.replace(/\.[^.]+$/, '.jpg');
+        document.getElementById('flashImg').value = url;
+        document.getElementById('flashImgPreview').innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;">`;
+        btn.innerText = '✅ 已上傳';
+      } else { btn.innerText = '❌ 失敗'; }
+    } catch(err) { btn.innerText = '❌ 錯誤'; console.error(err); }
+    btn.disabled = false;
+  };
+  input.click();
 }
 
 async function saveFlashItem() {
