@@ -1887,6 +1887,32 @@ function doPost(e) {
       }
     }
 
+    // ── 現貨搶購訂單通知（flash.html 提交表單後觸發，通知 admin）──
+    if (rowData.action === "flashOrderNotify") {
+      try {
+        var flRegionTxt = (rowData.region === 'tw') ? '🇹🇼 台灣' : '🇭🇰 香港';
+        var flSubject = "[⚡現貨搶購] " + (rowData.item_name || "") + " — " + (rowData.customer_name || "");
+        var flBody =
+          '<div style="font-family:sans-serif;max-width:520px;">' +
+          '<h2 style="color:#c2410c;">⚡ 新現貨搶購訂單</h2>' +
+          '<table style="border-collapse:collapse;font-size:14px;">' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">商品</td><td><strong>' + (rowData.item_name || "") + '</strong></td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">地區</td><td>' + flRegionTxt + '</td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">姓名</td><td>' + (rowData.customer_name || "") + '</td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">電話</td><td>' + (rowData.phone || "") + '</td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">Email</td><td>' + (rowData.email || "") + '</td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">付款方式</td><td>' + (rowData.pay_method || "") + '</td></tr>' +
+          (rowData.remark ? '<tr><td style="padding:4px 12px 4px 0;color:#888;">備註</td><td>' + rowData.remark + '</td></tr>' : '') +
+          '<tr><td style="padding:4px 12px 4px 0;color:#888;">Token</td><td style="font-size:12px;color:#aaa;">' + (rowData.token || "") + '</td></tr>' +
+          '</table>' +
+          '<p style="margin-top:16px;"><a href="' + ADMIN_PAGE_URL + '" style="color:#2563eb;">前往 Admin 後台處理 →</a></p>' +
+          '</div>';
+        MailApp.sendEmail({ to: MY_NOTIFICATION_EMAIL, subject: flSubject, htmlBody: flBody });
+      } catch(flErr) { Logger.log("flashOrderNotify error: " + flErr); }
+      return ContentService.createTextOutput(JSON.stringify({ result: "ok" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ── 功能 4：消費者下單 ────────────────────────────────────────────
     var sheet = ss.getSheetByName("訂單紀錄");
     if (!sheet) {
