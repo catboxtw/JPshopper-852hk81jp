@@ -1257,6 +1257,8 @@
               <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterPending" onclick="filterNissenOrders('pending')" >待付款</button>
               <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterPaid"   onclick="filterNissenOrders('paid')"    >已付款</button>
               <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterDone"   onclick="filterNissenOrders('confirmed')">已確認</button>
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterPurchased" onclick="filterNissenOrders('purchased')">已購入</button>
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterShipped"   onclick="filterNissenOrders('shipped')" >已寄出</button>
               <button class="btn btn-blue" style="font-size:13px;padding:6px 14px;" onclick="loadNissenOrders()">🔄</button>
             </div>
           </div>
@@ -5241,10 +5243,11 @@ async function loadNissenOrders() {
 
 function filterNissenOrders(status) {
   nissenOrderFilter = status;
-  ['All','Pending','Paid','Done'].forEach(s => {
+  const filterMap = { All:'all', Pending:'pending', Paid:'paid', Done:'confirmed', Purchased:'purchased', Shipped:'shipped' };
+  Object.entries(filterMap).forEach(([s, val]) => {
     const el = document.getElementById('nissenFilter' + s);
-    if (el) el.style.background = (s.toLowerCase() === status || (s === 'Done' && status === 'confirmed')) ? 'var(--blue)' : '';
-    if (el) el.style.color = (s.toLowerCase() === status || (s === 'Done' && status === 'confirmed')) ? '#fff' : '';
+    if (el) el.style.background = (val === status) ? 'var(--blue)' : '';
+    if (el) el.style.color = (val === status) ? '#fff' : '';
   });
   const filtered = status === 'all' ? allNissenOrders : allNissenOrders.filter(o => o.status === status);
   renderNissenOrders(filtered);
@@ -5253,8 +5256,8 @@ function filterNissenOrders(status) {
 function renderNissenOrders(orders) {
   const el = document.getElementById('nissenOrderList');
   if (!orders.length) { el.innerHTML = '<div style="color:var(--muted);font-size:14px;">沒有訂單</div>'; return; }
-  const statusLabel = { pending:'待付款', paid:'已付款', confirmed:'已確認', cancelled:'已取消' };
-  const statusColor = { pending:'#f59e0b', paid:'#3b82f6', confirmed:'#10b981', cancelled:'#ef4444' };
+  const statusLabel = { pending:'待付款', paid:'已付款', confirmed:'已確認', purchased:'已購入', shipped:'已寄出', cancelled:'已取消' };
+  const statusColor = { pending:'#f59e0b', paid:'#3b82f6', confirmed:'#10b981', purchased:'#8b5cf6', shipped:'#0ea5e9', cancelled:'#ef4444' };
   el.innerHTML = orders.map(o => {
     const st  = statusLabel[o.status] || o.status;
     const clr = statusColor[o.status] || '#6b7280';
@@ -5286,6 +5289,12 @@ function renderNissenOrders(orders) {
             : ''}
           ${(o.status === 'paid' || o.status === 'confirmed') && o.status !== 'cancelled'
             ? `<button class="btn btn-blue" style="font-size:12px;padding:4px 10px;" onclick="sendNissenConfirm(${o.id})">✉️ 發送確認 Email</button>`
+            : ''}
+          ${o.status === 'confirmed'
+            ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#8b5cf6;" onclick="setNissenStatus(${o.id},'purchased')">🛍️ 標記已購入</button>`
+            : ''}
+          ${o.status === 'purchased'
+            ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#0ea5e9;" onclick="setNissenStatus(${o.id},'shipped')">🚚 標記已寄出</button>`
             : ''}
           ${o.status !== 'cancelled'
             ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#dc2626;" onclick="cancelNissenOrder(${o.id})">✕ 取消</button>`
@@ -5320,6 +5329,14 @@ function viewNissenOrderItems(id) {
 async function markNissenPaid(id) {
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders?id=eq.' + id, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ status: 'paid' }) });
+    if (!res.ok) throw new Error(await res.text());
+    await loadNissenOrders();
+  } catch(e) { alert('更新失敗：' + e.message); }
+}
+
+async function setNissenStatus(id, status) {
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders?id=eq.' + id, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ status }) });
     if (!res.ok) throw new Error(await res.text());
     await loadNissenOrders();
   } catch(e) { alert('更新失敗：' + e.message); }
@@ -5465,6 +5482,7 @@ async function viewFlashOrders(itemId, itemName) {
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/flash_orders?item_id=eq.' + itemId + '&select=*&order=claimed_at.desc', { headers: SUPA_H });
     const orders = await res.json();
+    lastFlashOrders = orders;
     if (!orders.length) {
       list.innerHTML = '<div style="color:var(--muted);font-size:14px;">尚無訂單</div>';
       return;
@@ -5485,6 +5503,9 @@ async function viewFlashOrders(itemId, itemName) {
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
               ${o.status !== 'paid' && o.status !== 'cancelled'
                 ? `<button class="btn btn-blue" style="font-size:11px;padding:3px 8px;" onclick="markFlashPaid('${o.token}')">✅ 標記已付</button>`
+                : ''}
+              ${(o.status === 'submitted' || o.status === 'paid') && o.email
+                ? `<button class="btn btn-blue" style="font-size:11px;padding:3px 8px;" onclick="sendFlashConfirm('${o.token}',${itemId},'${itemName.replace(/'/g,"\\'")}')">✉️ 發送確認 Email</button>`
                 : ''}
               ${o.status !== 'cancelled'
                 ? `<button class="btn" style="font-size:11px;padding:3px 8px;color:#dc2626;" onclick="cancelFlashOrder('${o.token}',${itemId},'${itemName.replace(/'/g,"\\'")}')">✕ 取消</button>`
@@ -5684,6 +5705,32 @@ async function markFlashPaid(token) {
   } catch(e) {
     alert('更新失敗：' + e.message);
   }
+}
+
+let lastFlashOrders = [];
+
+async function sendFlashConfirm(token, itemId, itemName) {
+  const order = lastFlashOrders.find(o => o.token === token);
+  if (!order) return alert('找不到訂單資料，請重新開啟訂單面板');
+  if (!confirm(`確認發送付款確認 Email 給 ${order.customer_name || ''}（${order.email}）？`)) return;
+  try {
+    // GAS POST (no-cors：無法讀 response，樂觀顯示成功)
+    fetch(GAS, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sendFlashConfirmation', order, item_name: itemName }),
+    });
+    // 同步標記已付款
+    if (order.status !== 'paid') {
+      await fetch(SUPA_URL + '/rest/v1/flash_orders?token=eq.' + token, {
+        method: 'PATCH',
+        headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ status: 'paid', paid_at: new Date().toISOString() }),
+      });
+    }
+    alert('✅ 確認 Email 已發送！');
+    viewFlashOrders(itemId, itemName);
+  } catch(e) { alert('發送失敗：' + e.message); }
 }
 
 async function cancelFlashOrder(token, itemId, itemName) {

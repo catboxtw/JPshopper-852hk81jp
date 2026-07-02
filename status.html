@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>訂單狀態查詢 — 852hk.81jp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f6f3; --card: #fff; --ink: #1a1a1a; --muted: #888;
+      --border: #e8e6e1; --green: #10b981; --amber: #f59e0b; --red: #c62828; --blue: #3b82f6;
+    }
+    body { font-family: 'Noto Sans HK', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 60px; }
+    .topbar { text-align: center; padding: 16px 0 20px; }
+    .brand { font-size: 16px; font-weight: 600; letter-spacing: 3px; color: var(--ink); text-decoration: none; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    .page-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+    .page-sub { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 18px; }
+    .search-row { display: flex; gap: 8px; }
+    .search-row input { flex: 1; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; }
+    .search-row button { padding: 11px 20px; border: none; border-radius: 10px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .search-hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+    .order-head { text-align: center; margin-bottom: 16px; }
+    .order-no-chip { font-size: 13px; background: #f3f4f6; padding: 6px 14px; border-radius: 20px; display: inline-block; font-weight: 600; letter-spacing: 1px; color: #374151; }
+    .order-date { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    /* timeline */
+    .timeline { margin: 20px 0 8px; }
+    .tl-step { display: flex; gap: 14px; position: relative; padding-bottom: 26px; }
+    .tl-step:last-child { padding-bottom: 0; }
+    .tl-step::before { content: ''; position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--border); }
+    .tl-step:last-child::before { display: none; }
+    .tl-step.done::before { background: var(--green); }
+    .tl-dot { width: 28px; height: 28px; border-radius: 50%; background: var(--bg); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; z-index: 1; color: var(--muted); }
+    .tl-step.done .tl-dot { background: var(--green); border-color: var(--green); color: #fff; }
+    .tl-step.current .tl-dot { background: #fff; border-color: var(--amber); color: var(--amber); box-shadow: 0 0 0 4px #f59e0b22; }
+    .tl-info { padding-top: 4px; }
+    .tl-label { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .tl-step.done .tl-label, .tl-step.current .tl-label { color: var(--ink); }
+    .tl-desc { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+    .status-banner { border-radius: 12px; padding: 14px 16px; text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 16px; }
+    .status-banner.cancelled { background: #fee2e2; color: #b91c1c; }
+    .status-banner.pending { background: #fef3c7; color: #92400e; }
+    .status-banner.active { background: #d1fae5; color: #065f46; }
+    .item-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .item-row:last-child { border-bottom: none; }
+    .item-img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--bg); border: 1px solid var(--border); }
+    .item-name { font-size: 13px; font-weight: 500; }
+    .item-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .section-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .pay-cta { display: block; text-align: center; background: var(--ink); color: #fff; text-decoration: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 600; margin-top: 14px; }
+    .contact-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+    .contact-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--ink); text-decoration: none; font-weight: 500; }
+    .err-box { text-align: center; color: var(--red); font-size: 13px; padding: 20px 10px; line-height: 1.7; }
+    .back-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); text-decoration: none; }
+    .loading { text-align: center; padding: 30px; color: var(--muted); font-size: 13px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><a href="/" class="brand">852hk.81jp</a></div>
+
+  <div class="card">
+    <div class="page-title">📦 訂單狀態查詢</div>
+    <div class="page-sub">輸入訂單號碼即可查看最新進度</div>
+    <div class="search-row">
+      <input type="text" id="orderInput" placeholder="例：NK-20260701-AB3D" autocapitalize="characters">
+      <button onclick="lookup()">查詢</button>
+    </div>
+    <div class="search-hint">
+      💡 Nissen 代購訂單號以 <strong>NK-</strong> 開頭（在付款頁及確認 Email 內）<br>
+      ⚡ 現貨搶購請輸入 8 位訂單參考編號
+    </div>
+  </div>
+
+  <div id="resultWrap"></div>
+
+  <a href="/" class="back-link">← 返回首頁</a>
+</div>
+
+<script>
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+const SUPA_H = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
+const resultEl = document.getElementById('resultWrap');
+
+/* Nissen 訂單狀態流程 */
+const NISSEN_STEPS = [
+  { key: 'pending',   icon: '💰', label: '待付款',   desc: '請完成付款，我們收到款項後會開始處理' },
+  { key: 'paid',      icon: '✅', label: '已收款',   desc: '我們已收到您的款項' },
+  { key: 'confirmed', icon: '📋', label: '已確認訂單', desc: '訂單已確認，準備為您代購' },
+  { key: 'purchased', icon: '🛍️', label: '已購入',   desc: '商品已在日本購入，等待國際運送' },
+  { key: 'shipped',   icon: '🚚', label: '已寄出',   desc: '商品已寄出，請留意收件通知' },
+];
+
+/* Flash 現貨訂單狀態流程 */
+const FLASH_STEPS = [
+  { key: 'claimed',   icon: '⚡', label: '已搶到',   desc: '已成功搶到現貨' },
+  { key: 'submitted', icon: '📝', label: '已提交資料', desc: '資料已提交，請完成付款' },
+  { key: 'paid',      icon: '✅', label: '已確認收款', desc: '我們已確認收到款項，會盡快安排出貨／取貨' },
+];
+
+function esc(s) { return (s || '').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function timelineHtml(steps, currentIdx) {
+  return '<div class="timeline">' + steps.map((s, i) => {
+    const cls = i < currentIdx ? 'done' : (i === currentIdx ? (i === steps.length - 1 ? 'done' : 'current') : '');
+    const dotContent = i < currentIdx || (i === currentIdx && i === steps.length - 1) ? '✓' : s.icon;
+    return `
+      <div class="tl-step ${cls}">
+        <div class="tl-dot">${dotContent}</div>
+        <div class="tl-info">
+          <div class="tl-label">${s.label}</div>
+          <div class="tl-desc">${s.desc}</div>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+async function lookup(fromUrl) {
+  const raw = document.getElementById('orderInput').value.trim();
+  if (!raw) { if (!fromUrl) alert('請輸入訂單號碼'); return; }
+  resultEl.innerHTML = '<div class="card"><div class="loading">⏳ 查詢中…</div></div>';
+
+  const id = raw.toUpperCase();
+  try {
+    if (id.startsWith('NK-')) {
+      await lookupNissen(id);
+    } else {
+      await lookupFlash(id);
+    }
+  } catch(e) {
+    resultEl.innerHTML = '<div class="card"><div class="err-box">查詢失敗，請稍後重試<br>或直接聯絡我們</div></div>';
+  }
+}
+
+async function lookupNissen(orderNo) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/nissen_orders?order_no=eq.${encodeURIComponent(orderNo)}&select=*`, { headers: SUPA_H });
+  const rows = await res.json();
+  if (!rows || !rows[0]) { renderNotFound(orderNo); return; }
+  const o = rows[0];
+  const isHK = (o.region || 'hk') === 'hk';
+  const currency = isHK ? 'HK$' : 'NT$';
+  const items = o.items || [];
+  const date = o.created_at ? new Date(o.created_at).toLocaleString('zh-HK', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
+  if (o.status === 'cancelled') {
+    resultEl.innerHTML = `
+      <div class="card">
+        <div class="order-head"><span class="order-no-chip">${esc(o.order_no)}</span><div class="order-date">${date}</div></div>
+        <div class="status-banner cancelled">✕ 此訂單已取消</div>
+        <div style="font-size:12px;color:var(--muted);text-align:center;">如有疑問請聯絡我們</div>
+        ${contactHtml(isHK)}
+      </div>`;
+    return;
+  }
+
+  let idx = NISSEN_STEPS.findIndex(s => s.key === o.status);
+  if (idx < 0) idx = 0;
+
+  const itemsHtml = items.map(item => {
+    const img = item.image_url || item.image || '';
+    const sub = [item.color, item.size, item.desc].filter(Boolean).join(' / ');
+    const p = isHK ? (item.price_hkd || item.local || 0) : (item.price_twd || item.local || 0);
+    return `
+      <div class="item-row">
+        ${img ? `<img class="item-img" src="${esc(img)}" onerror="this.style.display='none'">` : ''}
+        <div style="flex:1;min-width:0;">
+          <div class="item-name">${esc(item.name)}${item.qty > 1 ? ` ×${item.qty}` : ''}</div>
+          ${sub ? `<div class="item-sub">${esc(sub)}</div>` : ''}
+        </div>
+        ${p ? `<div style="font-size:12px;color:#374151;">${currency}${Number(p * (item.qty || 1)).toLocaleString()}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  const banner = o.status === 'pending'
+    ? '<div class="status-banner pending">⏳ 等待付款中</div>'
+    : `<div class="status-banner active">${NISSEN_STEPS[idx].icon} ${NISSEN_STEPS[idx].label}</div>`;
+
+  resultEl.innerHTML = `
+    <div class="card">
+      <div class="order-head"><span class="order-no-chip">${esc(o.order_no)}</span><div class="order-date">下單時間：${date}</div></div>
+      ${banner}
+      ${timelineHtml(NISSEN_STEPS, idx)}
+      ${o.status === 'pending' ? `<a class="pay-cta" href="/nissen-pay?id=${encodeURIComponent(o.order_no)}&r=${o.region || 'hk'}">前往付款頁 →</a>` : ''}
+    </div>
+    <div class="card">
+      <div class="section-title">訂購清單</div>
+      ${itemsHtml || '<div style="font-size:12px;color:var(--muted);">（無明細）</div>'}
+    </div>
+    <div class="card">
+      <div class="section-title">有問題？</div>
+      ${contactHtml(isHK)}
+    </div>`;
+}
+
+async function lookupFlash(ref) {
+  // token 為 32 位 hex，參考編號 = 頭 8 位（大寫）
+  const prefix = ref.toLowerCase().replace(/[^a-f0-9]/g, '');
+  if (prefix.length < 6) { renderNotFound(ref); return; }
+  const res = await fetch(`${SUPA_URL}/rest/v1/flash_orders?token=ilike.${prefix}*&select=*&limit=1`, { headers: SUPA_H });
+  const rows = await res.json();
+  if (!rows || !rows[0]) { renderNotFound(ref); return; }
+  const o = rows[0];
+  const isHK = (o.region || 'hk') === 'hk';
+  const date = o.claimed_at ? new Date(o.claimed_at).toLocaleString('zh-HK', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
+  // 取商品名
+  let itemName = '';
+  try {
+    const ir = await fetch(`${SUPA_URL}/rest/v1/flash_stock?id=eq.${o.item_id}&select=name,image_url`, { headers: SUPA_H });
+    const irows = await ir.json();
+    if (irows && irows[0]) itemName = irows[0].name;
+  } catch(e) {}
+
+  if (o.status === 'cancelled') {
+    resultEl.innerHTML = `
+      <div class="card">
+        <div class="order-head"><span class="order-no-chip">${esc(ref)}</span><div class="order-date">${date}</div></div>
+        <div class="status-banner cancelled">✕ 此訂單已取消</div>
+        ${contactHtml(isHK)}
+      </div>`;
+    return;
+  }
+
+  let idx = FLASH_STEPS.findIndex(s => s.key === o.status);
+  if (idx < 0) idx = 0;
+
+  resultEl.innerHTML = `
+    <div class="card">
+      <div class="order-head">
+        <span class="order-no-chip">⚡ ${esc((o.token || '').slice(0,8).toUpperCase())}</span>
+        <div class="order-date">${itemName ? esc(itemName) + ' · ' : ''}${date}</div>
+      </div>
+      ${o.status === 'paid'
+        ? '<div class="status-banner active">✅ 已確認收款</div>'
+        : '<div class="status-banner pending">⏳ 處理中</div>'}
+      ${timelineHtml(FLASH_STEPS, idx)}
+    </div>
+    <div class="card">
+      <div class="section-title">有問題？</div>
+      ${contactHtml(isHK)}
+    </div>`;
+}
+
+function contactHtml(isHK) {
+  return `
+    <div class="contact-links">
+      <a class="contact-link" href="${isHK ? 'https://ig.me/m/852hk.81jp' : 'https://ig.me/m/886tw.81jp'}" target="_blank">📩 IG ${isHK ? '@852hk.81jp' : '@886tw.81jp'}</a>
+      ${isHK ? '<a class="contact-link" href="https://wa.me/85293375712" target="_blank">💬 WhatsApp</a>' : ''}
+    </div>`;
+}
+
+function renderNotFound(id) {
+  resultEl.innerHTML = `
+    <div class="card">
+      <div class="err-box">❌ 找不到訂單「${esc(id)}」<br>請確認號碼是否正確，或直接聯絡我們</div>
+      ${contactHtml(true)}
+    </div>`;
+}
+
+// URL ?id= 自動查詢
+const urlId = new URLSearchParams(location.search).get('id');
+if (urlId) {
+  document.getElementById('orderInput').value = urlId;
+  lookup(true);
+}
+document.getElementById('orderInput').addEventListener('keydown', e => { if (e.key === 'Enter') lookup(); });
+</script>
+</body>
+</html>

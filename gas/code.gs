@@ -1887,6 +1887,54 @@ function doPost(e) {
       }
     }
 
+    // ── Nissen 訂單通知（前台下單後 POST fire-and-forget，通知 admin）──
+    if (rowData.action === "nissenOrderNotify") {
+      try {
+        var pnOrder = rowData.order || {};
+        if (pnOrder.order_no || pnOrder.orderNo) {
+          var pnSubject = "[新 Nissen 代購訂單] " + (pnOrder.order_no || pnOrder.orderNo) + " — " + (pnOrder.customer_name || pnOrder.customerName || "") + " (" + (pnOrder.region || "").toUpperCase() + ")";
+          MailApp.sendEmail({ to: MY_NOTIFICATION_EMAIL, subject: pnSubject, htmlBody: buildNissenEmailHtml_(pnOrder, false) });
+        }
+      } catch(pnErr) { Logger.log("nissenOrderNotify(POST) error: " + pnErr); }
+      return ContentService.createTextOutput(JSON.stringify({ result: "ok" }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── 現貨搶購付款確認 email（admin 從 admin panel 觸發）──
+    if (rowData.action === "sendFlashConfirmation") {
+      try {
+        var fcOrder = rowData.order || {};
+        if (!fcOrder.email) {
+          return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "訂單沒有 email" }))
+                               .setMimeType(ContentService.MimeType.JSON);
+        }
+        var fcRef = (fcOrder.token || "").slice(0, 8).toUpperCase();
+        var fcIsTW = (fcOrder.region === 'tw');
+        var fcSubject = "[852hk.81jp] ⚡ 現貨訂單付款確認 " + fcRef;
+        var fcBody =
+          '<div style="font-family:sans-serif;max-width:520px;margin:0 auto;">' +
+          '<h2 style="color:#10b981;">✅ 已確認收到您的款項！</h2>' +
+          '<p style="font-size:14px;line-height:1.8;">' + (fcOrder.customer_name || "") + ' 您好，</p>' +
+          '<p style="font-size:14px;line-height:1.8;">我們已確認收到您的付款，以下現貨已為您保留：</p>' +
+          '<div style="background:#f7f6f3;border-radius:10px;padding:14px 18px;margin:14px 0;">' +
+          '<p style="font-size:15px;font-weight:700;margin:0;">' + (rowData.item_name || "現貨商品") + '</p>' +
+          '<p style="font-size:12px;color:#888;margin:6px 0 0;">訂單參考編號：<strong>' + fcRef + '</strong></p>' +
+          '</div>' +
+          '<p style="font-size:14px;line-height:1.8;">' +
+          (fcIsTW ? '我們會盡快安排出貨（賣貨便），出貨後會再通知您。' : '我們會盡快與您確認取貨／寄送安排。') +
+          '</p>' +
+          '<p style="font-size:13px;line-height:1.8;">查詢訂單進度：<a href="https://jpshopper-852hk81jp.vercel.app/status?id=' + fcRef + '" style="color:#2563eb;">按此查詢</a></p>' +
+          '<p style="font-size:12px;color:#888;margin-top:20px;">如有任何問題，歡迎直接回覆此 Email 或 IG 私訊我們。<br>852hk.81jp</p>' +
+          '</div>';
+        MailApp.sendEmail({ to: fcOrder.email, subject: fcSubject, htmlBody: fcBody });
+        return ContentService.createTextOutput(JSON.stringify({ result: "ok" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      } catch(fcErr) {
+        return ContentService.createTextOutput(JSON.stringify({ result: "error", message: fcErr.toString() }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
     // ── 現貨搶購訂單通知（flash.html 提交表單後觸發，通知 admin）──
     if (rowData.action === "flashOrderNotify") {
       try {
@@ -5957,9 +6005,11 @@ function buildNissenEmailHtml_(order, isConfirmation) {
       "</div>";
     } else {
       payBlock = "<div style=\"background:#f0fff4;border-left:4px solid #38a169;padding:14px;border-radius:4px;margin-top:16px;font-size:13px;color:#276749;\">" +
-        "<p style=\"margin:0 0 8px;font-weight:700;\">💰 付款方式</p>" +
-        "<p style=\"margin:0;\">請私訊我們 IG <strong>@886tw.81jp</strong> 或 Threads 索取付款資訊</p>" +
-        "<p style=\"margin:8px 0 0;font-size:12px;color:#555;\">⚠️ 付款時請告知訂單號：<strong>" + order.order_no + "</strong></p>" +
+        "<p style=\"margin:0 0 8px;font-weight:700;\">💰 付款方式（郵局銀行匯款）</p>" +
+        "<p style=\"margin:0 0 4px;\">銀行：<strong>中華郵政（郵局）</strong></p>" +
+        "<p style=\"margin:0 0 4px;\">局號／帳號：<strong>0041860-0025565</strong></p>" +
+        "<p style=\"margin:0;\">戶名：<strong>周◯恩</strong></p>" +
+        "<p style=\"margin:8px 0 0;font-size:12px;color:#555;\">⚠️ 匯款時請於備註填寫訂單號後4碼：<strong>" + (order.order_no || "").slice(-4) + "</strong></p>" +
       "</div>";
     }
   }
@@ -5994,6 +6044,9 @@ function buildNissenEmailHtml_(order, isConfirmation) {
     "</p>" +
     "<p style=\"font-size:11px;color:#aaa;margin-top:0;\">※ 不含國際運費，最終以實際費用為準</p>" +
     payBlock +
+    (isConfirmation
+      ? "<p style=\"font-size:13px;margin-top:16px;\">📦 隨時查詢訂單進度：<a href=\"https://jpshopper-852hk81jp.vercel.app/status?id=" + encodeURIComponent(order.order_no) + "\" style=\"color:#2563eb;font-weight:600;\">按此查詢</a></p>"
+      : "") +
     "<div style=\"margin-top:24px;padding-top:14px;border-top:1px dashed #ddd;font-size:12px;color:#999;\">" +
       (isConfirmation
         ? (isHK

@@ -78,17 +78,11 @@ const PAY_CONFIG = {
     },
   },
   tw: {
-    linepay: {
-      label: 'LINE Pay',
-      link: '',
-      qr: '',        // 放 LINE Pay QR code 圖片 URL
-      detail: '請私訊我們索取 LINE Pay 付款連結',
-    },
-    transfer: {
-      label: '銀行轉帳',
+    post: {
+      label: '郵局銀行匯款',
       link: '',
       qr: '',
-      detail: '請私訊我們索取銀行帳號',
+      detail: '銀行：<strong>中華郵政（郵局）</strong><br>局號／帳號：<strong>0041860-0025565</strong><br>戶名：<strong>周◯恩</strong><br><span style="font-size:12px;color:#92400e;">匯款時請於備註欄填寫訂單號後4碼</span>',
     },
   },
 };
@@ -204,6 +198,8 @@ async function init() {
       <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">付款後請傳截圖給我們確認，或有任何問題歡迎直接聯絡</p>
       ${igWaHtml}
     </div>
+
+    <a href="/status?id=${encodeURIComponent(order.order_no)}" style="display:block;text-align:center;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;margin-bottom:8px;">📦 隨時查詢訂單狀態 →</a>
 
     <a href="/" class="back-link">← 返回首頁</a>
   `;

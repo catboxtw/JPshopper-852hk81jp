@@ -334,7 +334,7 @@ async function handleSubmit(e) {
 
     // Update localStorage
     const claim = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    Object.assign(claim, { status: 'submitted', customer_name: body.customer_name });
+    Object.assign(claim, { status: 'submitted', customer_name: body.customer_name, pay_method: body.pay_method });
     localStorage.setItem(LS_KEY, JSON.stringify(claim));
 
     // Fire-and-forget GAS notification
@@ -412,8 +412,8 @@ function renderBrowsing() {
 function renderForm(token, reg) {
   const isHK = reg === 'hk';
   const payOpts = isHK
-    ? ['FPS（轉數快）','PayMe','ATM 轉帳'].map(v=>`<option>${v}</option>`).join('')
-    : ['銀行轉帳','LINE Pay','ATM 轉帳'].map(v=>`<option>${v}</option>`).join('');
+    ? ['FPS（轉數快）','PayMe'].map(v=>`<option>${v}</option>`).join('')
+    : ['郵局銀行匯款'].map(v=>`<option>${v}</option>`).join('');
 
   app.innerHTML = `
     <div class="flash-card">
@@ -459,12 +459,36 @@ function renderForm(token, reg) {
     </div>`;
 }
 
-/* ── Render: Submitted ───────────────────────────────── */
+/* ── 付款資訊（可在此更改） ───────────────────────────── */
+const FLASH_PAY = {
+  hk: {
+    'FPS（轉數快）': '轉數快號碼：<strong>8890873</strong><br>帳戶持有人：<strong>Chow W. Y.</strong>',
+    'PayMe': '一按即 PayMe：<a href="https://payme.hsbc/miru" style="color:#ef4444;font-weight:700;">payme.hsbc/miru</a>',
+  },
+  tw: {
+    '郵局銀行匯款': '銀行：<strong>中華郵政（郵局）</strong><br>局號／帳號：<strong>0041860-0025565</strong><br>戶名：<strong>周◯恩</strong>',
+  },
+};
+
+/* ── Render: Submitted（顯示付款資訊） ────────────────── */
 function renderSubmitted(claim) {
   const ref = (claim.token || '').slice(0, 8).toUpperCase();
+  const reg = claim.region || region || 'hk';
+  const isHK = reg === 'hk';
+  const price = item ? (isHK ? item.price_hkd : item.price_twd) : 0;
+  const currency = isHK ? 'HK$' : 'NT$';
+
+  const regionPay = FLASH_PAY[reg] || FLASH_PAY.hk;
+  const chosen = claim.pay_method && regionPay[claim.pay_method] ? { [claim.pay_method]: regionPay[claim.pay_method] } : regionPay;
+  const payHtml = Object.entries(chosen).map(([label, detail]) => `
+    <div style="border:2px solid #e8e6e1;border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">${label}</div>
+      <div style="font-size:13px;line-height:1.8;color:#374151;">${detail}</div>
+    </div>`).join('');
+
   app.innerHTML = `
     <div class="flash-card">
-      <div class="status-banner submitted">🎉 訂單已提交！</div>
+      <div class="status-banner submitted">🎉 搶購成功！請完成付款</div>
       ${imgHtml()}
       <div class="flash-body">
         <div class="flash-name">${item ? esc(item.name) : '現貨'}</div>
@@ -472,9 +496,13 @@ function renderSubmitted(claim) {
           <div class="order-ref-label">訂單參考編號</div>
           <div class="order-ref-code">${ref}</div>
         </div>
-        <div class="flash-note" style="margin-bottom:20px;">
-          店主確認後會透過 IG / 電郵 聯絡你<br>安排付款及取貨詳情
+        ${price ? `<div style="font-size:15px;font-weight:700;margin:12px 0 4px;">付款金額：${currency}${Number(price).toLocaleString()}</div>` : ''}
+        <div style="margin-top:12px;">${payHtml}</div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px;font-size:12px;color:#92400e;line-height:1.7;text-align:left;margin-bottom:16px;">
+          ⚠️ 付款時請於備註填寫參考編號 <strong>${ref}</strong>，並將付款截圖傳給我們。<br>
+          我們確認收款後會發送確認 Email 給你，安排取貨／寄送詳情。
         </div>
+        <a href="/status?id=${ref}" style="display:block;text-align:center;border:1px solid #e8e6e1;border-radius:10px;padding:11px;font-size:13px;font-weight:600;color:#1a1a1a;text-decoration:none;margin-bottom:14px;">📦 查詢訂單狀態 →</a>
         <div class="ig-links">
           <a class="ig-btn hk" href="https://ig.me/m/852hk.81jp">📩 香港 IG @852hk.81jp</a>
           <a class="ig-btn tw" href="https://ig.me/m/886tw.81jp">📩 台灣 IG @886tw.81jp</a>
