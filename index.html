@@ -217,6 +217,41 @@
       border: 1.5px dashed var(--border); border-radius: 12px;
     }
     .coming-soon .cs-icon { font-size: 24px; margin-bottom: 8px; }
+
+    /* ── 推薦商品 ── */
+    .rec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+    @media (min-width: 480px) { .rec-grid { grid-template-columns: repeat(3, 1fr); } }
+    .rec-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; }
+    .rec-card-img { width: 100%; aspect-ratio: 1; object-fit: cover; background: var(--bg); display: block; }
+    .rec-card-img-placeholder { width: 100%; aspect-ratio: 1; background: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .rec-card-body { padding: 8px 10px; flex: 1; display: flex; flex-direction: column; }
+    .rec-card-name { font-size: 12px; font-weight: 600; line-height: 1.4; margin-bottom: 2px; }
+    .rec-card-desc { font-size: 10px; color: var(--muted); line-height: 1.4; flex: 1; }
+    .rec-card-price { font-size: 12px; font-weight: 700; color: var(--general); margin: 6px 0 4px; }
+    .rec-card-btn { width: 100%; padding: 6px; font-size: 11px; font-weight: 600; background: var(--general); color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
+    .rec-card-btn:hover { opacity: 0.85; }
+    .rec-card-btn:disabled { background: var(--border); color: var(--muted); cursor: not-allowed; }
+
+    /* ── 購物車 + 表單 ── */
+    .nissen-cart-wrap { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .nissen-cart-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .cart-badge { background: var(--general); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 11px; font-weight: 600; }
+    .cart-item-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .cart-item-img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--bg); border: 1px solid var(--border); }
+    .cart-item-info { flex: 1; min-width: 0; }
+    .cart-item-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cart-item-sub { font-size: 10px; color: var(--muted); }
+    .cart-item-price { font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .cart-item-del { background: none; border: none; cursor: pointer; color: var(--muted); padding: 2px 4px; font-size: 14px; flex-shrink: 0; }
+    .cart-total { text-align: right; font-size: 13px; font-weight: 700; padding: 10px 0 14px; color: var(--ink); }
+    .cart-form { display: flex; flex-direction: column; gap: 8px; }
+    .cart-form input, .cart-form textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: var(--bg); color: var(--ink); font-family: inherit; }
+    .cart-form textarea { min-height: 60px; resize: vertical; }
+    .cart-form input:focus, .cart-form textarea:focus { outline: none; border-color: var(--general); }
+    .cart-submit-btn { width: 100%; padding: 11px; background: var(--general); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; margin-top: 4px; }
+    .cart-submit-btn:hover { opacity: 0.88; }
+    .cart-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .cart-empty-hint { font-size: 12px; color: var(--muted); text-align: center; padding: 12px 0; }
   </style>
 </head>
 <body>
@@ -306,18 +341,29 @@
       </div>
       <div style="margin-top:14px;">
         <div id="nissenMarqueeWrapHK" style="display:none;"></div>
+
+        <!-- 本月推薦商品 -->
+        <div id="nissenRecHK" style="display:none;">
+          <div class="service-contact-label" style="margin-bottom:8px;">⭐ 本月推薦</div>
+          <div class="rec-grid" id="recGridHK"></div>
+        </div>
+
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="nissenSlotsHK"></div>
         <button onclick="addNissenSlot('hk')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
-        <div id="nissenCopyAreaHK" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-          <p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>
-          <button id="nissenCopyAllHK" onclick="copyAllNissenSlots('hk')"
-            style="padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;margin-bottom:10px;">📋 複製所有訂購資料</button>
-          <div class="service-contact-label" style="margin-bottom:4px;">🔗 聯絡店主</div>
-          <div class="service-contact">
-            <a class="contact-link" href="https://ig.me/m/852hk.81jp" target="_blank"><span>IG</span>@852hk.81jp</a>
-            <a class="contact-link" href="https://www.threads.com/@852hk.81jp" target="_blank"><span>Threads</span>@852hk.81jp</a>
+
+        <!-- 購物車 + 訂單表單 -->
+        <div id="nissenCartAreaHK" style="display:none;" class="nissen-cart-wrap">
+          <div class="nissen-cart-title">🛒 購物車 <span class="cart-badge" id="cartBadgeHK">0</span></div>
+          <div id="cartItemsHK"></div>
+          <div class="cart-total" id="cartTotalHK"></div>
+          <div class="cart-form">
+            <input type="text"  id="nissenNameHK"  placeholder="姓名 *" required>
+            <input type="email" id="nissenEmailHK" placeholder="電郵 *" required>
+            <input type="tel"   id="nissenPhoneHK" placeholder="電話（選填）">
+            <textarea id="nissenRemarkHK" placeholder="備注：地址、款式備注、問題等（選填）"></textarea>
+            <button class="cart-submit-btn" id="nissenSubmitHK" onclick="submitNissenOrder('hk')">📦 送出訂單 →</button>
           </div>
         </div>
       </div>
@@ -339,18 +385,29 @@
       </div>
       <div style="margin-top:14px;">
         <div id="nissenMarqueeWrapTW" style="display:none;"></div>
+
+        <!-- 本月推薦商品 -->
+        <div id="nissenRecTW" style="display:none;">
+          <div class="service-contact-label" style="margin-bottom:8px;">⭐ 本月推薦</div>
+          <div class="rec-grid" id="recGridTW"></div>
+        </div>
+
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="nissenSlotsTW"></div>
         <button onclick="addNissenSlot('tw')"
           style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
-        <div id="nissenCopyAreaTW" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-          <p style="font-size:10px;color:var(--muted);margin-bottom:6px;">👆 點選顏色及尺寸後，一鍵複製聯絡店主購買吧～</p>
-          <button id="nissenCopyAllTW" onclick="copyAllNissenSlots('tw')"
-            style="padding:8px 12px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;width:100%;font-weight:500;margin-bottom:10px;">📋 複製所有訂購資料</button>
-          <div class="service-contact-label" style="margin-bottom:4px;">🔗 聯絡店主</div>
-          <div class="service-contact">
-            <a class="contact-link" href="https://ig.me/m/886tw.81jp" target="_blank"><span>IG</span>@886tw.81jp</a>
-            <a class="contact-link" href="https://www.threads.com/@886tw.81jp" target="_blank"><span>Threads</span>@886tw.81jp</a>
+
+        <!-- 購物車 + 訂單表單 -->
+        <div id="nissenCartAreaTW" style="display:none;" class="nissen-cart-wrap">
+          <div class="nissen-cart-title">🛒 購物車 <span class="cart-badge" id="cartBadgeTW">0</span></div>
+          <div id="cartItemsTW"></div>
+          <div class="cart-total" id="cartTotalTW"></div>
+          <div class="cart-form">
+            <input type="text"  id="nissenNameTW"  placeholder="姓名 *" required>
+            <input type="email" id="nissenEmailTW" placeholder="電郵 *" required>
+            <input type="tel"   id="nissenPhoneTW" placeholder="電話（選填）">
+            <textarea id="nissenRemarkTW" placeholder="備注：地址、款式備注、問題等（選填）"></textarea>
+            <button class="cart-submit-btn" id="nissenSubmitTW" onclick="submitNissenOrder('tw')">📦 送出訂單 →</button>
           </div>
         </div>
       </div>
@@ -703,7 +760,7 @@ async function fetchNissenSlot(slotEl, region) {
     resultEl.innerHTML = html;
 
     // 儲存 slot 狀態
-    slotEl._nissen = { url, name: data.name || '', data, rate, currency, localLabel, defJpy, defLocal, curJpy: defJpy, curLocal: defLocal, color: '', size: '' };
+    slotEl._nissen = { url, name: data.name || '', image: data.image || '', data, rate, currency, localLabel, defJpy, defLocal, curJpy: defJpy, curLocal: defLocal, color: '', size: '' };
 
     // 顏色點選
     resultEl.querySelectorAll('.nissen-clr-btn').forEach(btn => {
@@ -723,9 +780,30 @@ async function fetchNissenSlot(slotEl, region) {
         nissenUpdatePrice_(slotEl, resultEl);
       });
     });
-    // 顯示「複製所有」區域
-    const copyArea = document.getElementById('nissenCopyArea' + region.toUpperCase());
-    if (copyArea) copyArea.style.display = '';
+
+    // 加入購物車按鈕
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '＋ 加入購物車';
+    addBtn.style.cssText = 'margin-top:10px;width:100%;padding:9px;background:var(--general);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;';
+    addBtn.addEventListener('click', () => {
+      const d = slotEl._nissen;
+      addToCart(region, {
+        type: 'nissen',
+        url: d.url,
+        name: d.name,
+        image_url: d.image,
+        color: d.color,
+        size: d.size,
+        jpy: d.curJpy ? parseFloat(d.curJpy.replace(/[¥,]/g,'')) : 0,
+        price_hkd: region === 'hk' ? (d.curLocal ? parseFloat(d.curLocal.replace(/[^0-9.]/g,'')) : 0) : 0,
+        price_twd: region === 'tw' ? (d.curLocal ? parseFloat(d.curLocal.replace(/[^0-9.]/g,'')) : 0) : 0,
+        local: d.curLocal ? parseFloat(d.curLocal.replace(/[^0-9.]/g,'')) : 0,
+        qty: 1,
+      });
+      addBtn.textContent = '✓ 已加入';
+      addBtn.disabled = true;
+    });
+    resultEl.appendChild(addBtn);
 
   } catch(e) {
     resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 查詢失敗：${e.message}</p>`;
@@ -757,32 +835,199 @@ function nissenUpdatePrice_(slotEl, resultEl) {
   if (localEl) localEl.textContent = d.curLocal  || (specificPrice ? '' : d.defLocal || '');
 }
 
-function nissenSlotText_(d) {
-  const priceStr = (d.curJpy || '') + (d.curLocal ? ' / ' + d.curLocal : '');
-  return [
-    d.url,
-    d.name ? `商品：${d.name}` : '',
-    `款式/顏色：${d.color}`,
-    `尺寸：${d.size}`,
-    `日幣＆${d.localLabel}：${priceStr}`
-  ].filter(Boolean).join('\n');
+// ── 購物車 ──
+const carts = { hk: [], tw: [] };
+
+function cartKey(region) { return 'nissenCart_' + region; }
+
+function loadCart(region) {
+  try {
+    const stored = localStorage.getItem(cartKey(region));
+    if (stored) carts[region] = JSON.parse(stored);
+  } catch(e) {}
 }
 
-async function nissenCopy_(text, btn, defaultLabel) {
-  try { await navigator.clipboard.writeText(text); }
-  catch(_) {
-    const ta = Object.assign(document.createElement('textarea'), {value: text});
-    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove();
+function saveCart(region) {
+  try { localStorage.setItem(cartKey(region), JSON.stringify(carts[region])); } catch(e) {}
+}
+
+function addToCart(region, item) {
+  carts[region].push(item);
+  saveCart(region);
+  renderCart(region);
+  const area = document.getElementById('nissenCartArea' + region.toUpperCase());
+  if (area) { area.style.display = ''; area.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+}
+
+function removeFromCart(region, idx) {
+  carts[region].splice(idx, 1);
+  saveCart(region);
+  renderCart(region);
+}
+
+function renderCart(region) {
+  const R = region.toUpperCase();
+  const area  = document.getElementById('nissenCartArea' + R);
+  const badge = document.getElementById('cartBadge' + R);
+  const itemsEl = document.getElementById('cartItems' + R);
+  const totalEl = document.getElementById('cartTotal' + R);
+  const cart = carts[region];
+  const isHK = region === 'hk';
+  const currency = isHK ? 'HK$' : 'NT$';
+
+  if (!cart.length) {
+    if (area) area.style.display = 'none';
+    return;
   }
-  if (btn) { btn.textContent = '✓ 已複製！'; setTimeout(() => { btn.textContent = defaultLabel; }, 2000); }
+  if (area) area.style.display = '';
+  if (badge) badge.textContent = cart.length;
+
+  let total = 0;
+  itemsEl.innerHTML = cart.map((item, idx) => {
+    const localPrice = isHK ? (item.price_hkd || item.local || 0) : (item.price_twd || item.local || 0);
+    const sub = item.type === 'nissen'
+      ? [item.color, item.size].filter(Boolean).join(' / ')
+      : item.desc || '';
+    const imgHtml = item.image_url
+      ? `<img class="cart-item-img" src="${item.image_url}" onerror="this.style.display='none'">`
+      : '';
+    total += localPrice * (item.qty || 1);
+    return `
+      <div class="cart-item-row">
+        ${imgHtml}
+        <div class="cart-item-info">
+          <div class="cart-item-name">${item.name}</div>
+          ${sub ? `<div class="cart-item-sub">${sub}</div>` : ''}
+          ${item.jpy ? `<div class="cart-item-sub">¥${Number(item.jpy).toLocaleString()}</div>` : ''}
+        </div>
+        <div class="cart-item-price">${localPrice ? currency + Math.ceil(localPrice).toLocaleString() : '—'}</div>
+        <button class="cart-item-del" onclick="removeFromCart('${region}', ${idx})" title="移除">✕</button>
+      </div>`;
+  }).join('');
+
+  totalEl.innerHTML = `預計小計：<strong>${currency}${Math.ceil(total).toLocaleString()}</strong> <span style="font-size:10px;color:var(--muted);">（不含運費）</span>`;
 }
 
-async function copyAllNissenSlots(region) {
-  const container = document.getElementById('nissenSlots' + region.toUpperCase());
-  const slots = [...container.querySelectorAll('.nissen-slot')].filter(s => s._nissen);
-  if (!slots.length) return;
-  const text = slots.map(s => nissenSlotText_(s._nissen)).join('\n\n') + '\n\n請幫我代購~ 謝謝!✨';
-  await nissenCopy_(text, document.getElementById('nissenCopyAll' + region.toUpperCase()), '📋 複製所有訂購資料');
+// ── 推薦商品 ──
+let recProducts = [];
+
+async function loadNissenRecommended() {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/nissen_recommended?active=eq.true&select=*&order=sort_order.asc,id.asc`, { headers: SUPA_HEADERS });
+    recProducts = await res.json();
+    if (!recProducts.length) return;
+    ['HK', 'TW'].forEach(R => {
+      const wrap = document.getElementById('nissenRec' + R);
+      const grid = document.getElementById('recGrid' + R);
+      if (!wrap || !grid) return;
+      const region = R.toLowerCase();
+      const isHK = region === 'hk';
+      const currency = isHK ? 'HK$' : 'NT$';
+      grid.innerHTML = recProducts.map(p => {
+        const localPrice = isHK ? p.price_hkd : p.price_twd;
+        const imgHtml = p.image_url
+          ? `<img class="rec-card-img" src="${p.image_url}" alt="${p.name}" onerror="this.src=''; this.style.display='none'; this.nextElementSibling.style.display='flex'">`
+          : '';
+        return `
+          <div class="rec-card">
+            ${imgHtml}
+            <div class="rec-card-img-placeholder" ${p.image_url ? 'style="display:none;"' : ''}>🛍️</div>
+            <div class="rec-card-body">
+              <div class="rec-card-name">${p.name}</div>
+              ${p.description ? `<div class="rec-card-desc">${p.description}</div>` : ''}
+              <div class="rec-card-price">${localPrice ? currency + Number(localPrice).toLocaleString() : '詢問報價'}</div>
+              <button class="rec-card-btn" onclick="addRecToCart('${region}', ${p.id}, this)">＋ 加入購物車</button>
+            </div>
+          </div>`;
+      }).join('');
+      wrap.style.display = '';
+    });
+  } catch(e) {}
+}
+
+function addRecToCart(region, productId, btn) {
+  const p = recProducts.find(r => r.id === productId);
+  if (!p) return;
+  addToCart(region, {
+    type: 'recommended',
+    id: p.id,
+    name: p.name,
+    desc: p.description || '',
+    image_url: p.image_url || '',
+    nissen_url: p.nissen_url || '',
+    price_hkd: p.price_hkd || 0,
+    price_twd: p.price_twd || 0,
+    price_jpy: p.price_jpy || 0,
+    local: region === 'hk' ? (p.price_hkd || 0) : (p.price_twd || 0),
+    qty: 1,
+  });
+  if (btn) { btn.textContent = '✓ 已加入'; btn.disabled = true; }
+}
+
+// ── 提交訂單 ──
+async function submitNissenOrder(region) {
+  const R = region.toUpperCase();
+  const name   = (document.getElementById('nissenName'  + R).value || '').trim();
+  const email  = (document.getElementById('nissenEmail' + R).value || '').trim();
+  const phone  = (document.getElementById('nissenPhone' + R).value || '').trim();
+  const remark = (document.getElementById('nissenRemark'+ R).value || '').trim();
+  const cart   = carts[region];
+
+  if (!name)  { alert('請填寫姓名'); return; }
+  if (!email || !email.includes('@')) { alert('請填寫有效電郵'); return; }
+  if (!cart.length) { alert('購物車是空的'); return; }
+
+  const btn = document.getElementById('nissenSubmit' + R);
+  btn.disabled = true;
+  btn.textContent = '⏳ 提交中…';
+
+  // 生成訂單號
+  const now = new Date();
+  const dateStr = now.getFullYear().toString() +
+    String(now.getMonth()+1).padStart(2,'0') +
+    String(now.getDate()).padStart(2,'0');
+  const rand = Math.random().toString(36).substr(2,4).toUpperCase();
+  const orderNo = `NK-${dateStr}-${rand}`;
+
+  const orderData = {
+    order_no: orderNo,
+    region,
+    customer_name: name,
+    customer_email: email,
+    customer_phone: phone,
+    items: cart,
+    remark,
+    status: 'pending',
+  };
+
+  try {
+    // 儲存到 Supabase
+    const res = await fetch(`${SUPA_URL}/rest/v1/nissen_orders`, {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(orderData),
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
+
+    // 通知 admin（fire-and-forget，不阻塞跳轉）
+    try {
+      fetch(`${GAS_API_URL}?action=nissenOrderNotify&orderJson=${encodeURIComponent(JSON.stringify(orderData))}`);
+    } catch(e) {}
+
+    // 存到 localStorage 供付款頁讀取
+    localStorage.setItem('nissenOrder_' + orderNo, JSON.stringify(orderData));
+
+    // 清空購物車
+    carts[region] = [];
+    saveCart(region);
+
+    // 跳轉到付款頁
+    location.href = `/nissen-pay?id=${orderNo}&r=${region}`;
+  } catch(e) {
+    alert('提交失敗：' + e.message);
+    btn.disabled = false;
+    btn.textContent = '📦 送出訂單 →';
+  }
 }
 
 function initNissenMarqueeScroll(outer) {
@@ -851,6 +1096,11 @@ loadData();
 addNissenSlot('hk');
 addNissenSlot('tw');
 loadNissenFeatured();
+loadNissenRecommended();
+loadCart('hk');
+loadCart('tw');
+renderCart('hk');
+renderCart('tw');
 </script>
 </body>
 </html>

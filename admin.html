@@ -701,6 +701,15 @@
       <div class="nav-item" onclick="goto('flash'); closeSidebar();" id="nav-flash">
         <span class="nav-icon">⚡</span> 現貨搶購
       </div>
+
+      <div class="nav-section-label">Nissen 服務</div>
+      <div class="nav-item" onclick="goto('nissen-products'); closeSidebar();" id="nav-nissen-products">
+        <span class="nav-icon">⭐</span> 推薦商品
+      </div>
+      <div class="nav-item" onclick="goto('nissen-orders'); closeSidebar();" id="nav-nissen-orders">
+        <span class="nav-icon">📥</span> 代購訂單
+        <span class="nav-badge" id="badgeNissenOrders" style="display:none;background:#ef4444;"></span>
+      </div>
     </nav>
     <div class="sidebar-footer">852hk.81jp © 2025</div>
   </aside>
@@ -1154,6 +1163,88 @@
 
       </div><!-- /page-flash -->
 
+      <!-- ════ PAGE: Nissen 推薦商品 ════ -->
+      <div class="page" id="page-nissen-products">
+
+        <div class="card" id="nissenRecFormCard">
+          <div style="font-weight:700;font-size:15px;margin-bottom:14px;">⭐ 推薦商品</div>
+          <input type="hidden" id="recEditId">
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">商品名稱 *</label>
+              <input type="text" id="recName" placeholder="例：綿混タートルネックセーター" style="font-size:14px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">簡短描述</label>
+              <input type="text" id="recDesc" placeholder="例：日本尺寸 M / 米白" style="font-size:14px;">
+            </div>
+          </div>
+          <div class="form-field">
+            <label class="form-label">Nissen 商品網址</label>
+            <input type="url" id="recUrl" placeholder="https://www.nissen.co.jp/..." style="font-size:13px;">
+          </div>
+          <div class="form-field">
+            <label class="form-label">商品圖片網址</label>
+            <input type="url" id="recImg" placeholder="https://..." oninput="previewRecImg()" style="font-size:13px;">
+            <div id="recImgPreview" style="display:none;margin-top:6px;">
+              <img id="recImgTag" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">港幣售價 (HK$)</label>
+              <input type="number" id="recPriceHkd" placeholder="0" style="font-size:15px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">台幣售價 (NT$)</label>
+              <input type="number" id="recPriceTwd" placeholder="0" style="font-size:15px;">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="form-label">日幣原價 (¥)</label>
+              <input type="number" id="recPriceJpy" placeholder="0" style="font-size:15px;">
+            </div>
+            <div class="form-field">
+              <label class="form-label">排序（數字小的排前）</label>
+              <input type="number" id="recSort" placeholder="0" value="0" style="font-size:15px;">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button class="btn btn-blue" style="flex:1;padding:10px;" onclick="saveRecProduct()">💾 儲存</button>
+            <button class="btn" style="padding:10px 16px;" onclick="clearRecForm()">✕ 清除</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-weight:700;font-size:15px;">商品列表</div>
+            <button class="btn btn-blue" style="font-size:13px;padding:6px 14px;" onclick="loadRecProducts()">🔄 重新整理</button>
+          </div>
+          <div id="recProductList"><div style="color:var(--muted);font-size:14px;">載入中…</div></div>
+        </div>
+
+      </div><!-- /page-nissen-products -->
+
+      <!-- ════ PAGE: Nissen 代購訂單 ════ -->
+      <div class="page" id="page-nissen-orders">
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+            <div style="font-weight:700;font-size:15px;">Nissen 代購訂單</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterAll"    onclick="filterNissenOrders('all')"     >全部</button>
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterPending" onclick="filterNissenOrders('pending')" >待付款</button>
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterPaid"   onclick="filterNissenOrders('paid')"    >已付款</button>
+              <button class="btn" style="font-size:12px;padding:5px 10px;" id="nissenFilterDone"   onclick="filterNissenOrders('confirmed')">已確認</button>
+              <button class="btn btn-blue" style="font-size:13px;padding:6px 14px;" onclick="loadNissenOrders()">🔄</button>
+            </div>
+          </div>
+          <div id="nissenOrderList"><div style="color:var(--muted);font-size:14px;">載入中…</div></div>
+        </div>
+
+      </div><!-- /page-nissen-orders -->
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /adminApp -->
@@ -1412,7 +1503,7 @@ async function loadSheetList() {
 }
 
 // ── Navigation ──
-const pageTitles = { orders:'所有訂單', picking:'執貨清單', refund:'退款區', stock:'庫存管理', purchase:'買貨區', settle:'結算區', profit:'盈利計算', events:'建立活動', products:'上架商品', flash:'現貨搶購' };
+const pageTitles = { orders:'所有訂單', picking:'執貨清單', refund:'退款區', stock:'庫存管理', purchase:'買貨區', settle:'結算區', profit:'盈利計算', events:'建立活動', products:'上架商品', flash:'現貨搶購', 'nissen-products':'Nissen 推薦商品', 'nissen-orders':'Nissen 代購訂單' };
 function goto(page) {
   currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1441,6 +1532,9 @@ function goto(page) {
   }
   // 現貨搶購載入
   if (page === 'flash') loadFlashItems();
+  // Nissen
+  if (page === 'nissen-products') loadRecProducts();
+  if (page === 'nissen-orders') loadNissenOrders();
 }
 function handleRefresh() { fetchOrders(); }
 
@@ -4836,6 +4930,265 @@ async function syncAllEventsToSupabase() {
   btn.innerText = origText;
   btn.disabled = false;
   alert(`✅ 同步完成\n成功：${ok}\n失敗：${failed}\n總數：${eventList.length}`);
+}
+
+// ══════════════════════════════════════════════════
+// ⭐ Nissen 推薦商品管理
+// ══════════════════════════════════════════════════
+
+let recProducts = [];
+
+async function loadRecProducts() {
+  document.getElementById('recProductList').innerHTML = '<div style="color:var(--muted);font-size:14px;">載入中…</div>';
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_recommended?select=*&order=sort_order.asc,id.asc', { headers: SUPA_H });
+    recProducts = await res.json();
+    renderRecProductList();
+  } catch(e) {
+    document.getElementById('recProductList').innerHTML = '<div style="color:red;font-size:13px;">載入失敗：' + e.message + '</div>';
+  }
+}
+
+function renderRecProductList() {
+  const el = document.getElementById('recProductList');
+  if (!recProducts.length) { el.innerHTML = '<div style="color:var(--muted);font-size:14px;">尚無商品</div>'; return; }
+  el.innerHTML = recProducts.map(p => {
+    const imgHtml = p.image_url ? `<img src="${p.image_url}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" onerror="this.style.display='none'">` : `<div style="width:48px;height:48px;background:#f3f4f6;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;">⭐</div>`;
+    return `
+      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          ${imgHtml}
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:14px;">${p.name} ${p.active ? '<span style="background:#d1fae5;color:#065f46;border-radius:20px;padding:1px 8px;font-size:11px;">顯示中</span>' : '<span style="background:#f3f4f6;color:#6b7280;border-radius:20px;padding:1px 8px;font-size:11px;">已隱藏</span>'}</div>
+            <div style="font-size:12px;color:var(--muted);">${p.description || ''}</div>
+            <div style="font-size:12px;margin-top:3px;">HK$${p.price_hkd||0} / NT$${p.price_twd||0} / ¥${p.price_jpy||0}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="editRecProduct(${p.id})">✏️ 編輯</button>
+          ${p.active
+            ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#dc2626;" onclick="toggleRecActive(${p.id},false)">🙈 隱藏</button>`
+            : `<button class="btn btn-blue" style="font-size:12px;padding:4px 10px;" onclick="toggleRecActive(${p.id},true)">👁 顯示</button>`
+          }
+          <button class="btn" style="font-size:12px;padding:4px 10px;color:#dc2626;" onclick="deleteRecProduct(${p.id})">🗑 刪除</button>
+          ${p.nissen_url ? `<a href="${p.nissen_url}" target="_blank" class="btn" style="font-size:12px;padding:4px 10px;">🔗 Nissen</a>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function previewRecImg() {
+  const url = document.getElementById('recImg').value.trim();
+  const prev = document.getElementById('recImgPreview');
+  const img  = document.getElementById('recImgTag');
+  if (url) { img.src = url; prev.style.display = ''; }
+  else { prev.style.display = 'none'; }
+}
+
+function clearRecForm() {
+  ['recEditId','recName','recDesc','recUrl','recImg','recPriceHkd','recPriceTwd','recPriceJpy'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('recSort').value = '0';
+  document.getElementById('recImgPreview').style.display = 'none';
+}
+
+function editRecProduct(id) {
+  const p = recProducts.find(r => r.id === id);
+  if (!p) return;
+  document.getElementById('recEditId').value  = id;
+  document.getElementById('recName').value    = p.name;
+  document.getElementById('recDesc').value    = p.description || '';
+  document.getElementById('recUrl').value     = p.nissen_url  || '';
+  document.getElementById('recImg').value     = p.image_url   || '';
+  document.getElementById('recPriceHkd').value = p.price_hkd || '';
+  document.getElementById('recPriceTwd').value = p.price_twd || '';
+  document.getElementById('recPriceJpy').value = p.price_jpy || '';
+  document.getElementById('recSort').value    = p.sort_order  || 0;
+  previewRecImg();
+  document.getElementById('nissenRecFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function saveRecProduct() {
+  const editId = document.getElementById('recEditId').value;
+  const name = document.getElementById('recName').value.trim();
+  if (!name) { alert('請填寫商品名稱'); return; }
+  const payload = {
+    name,
+    description: document.getElementById('recDesc').value.trim(),
+    nissen_url:  document.getElementById('recUrl').value.trim(),
+    image_url:   document.getElementById('recImg').value.trim(),
+    price_hkd:   parseFloat(document.getElementById('recPriceHkd').value) || 0,
+    price_twd:   parseFloat(document.getElementById('recPriceTwd').value) || 0,
+    price_jpy:   parseFloat(document.getElementById('recPriceJpy').value) || 0,
+    sort_order:  parseInt(document.getElementById('recSort').value) || 0,
+    updated_at:  new Date().toISOString(),
+  };
+  try {
+    let res;
+    if (editId) {
+      res = await fetch(SUPA_URL + '/rest/v1/nissen_recommended?id=eq.' + editId, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) });
+    } else {
+      res = await fetch(SUPA_URL + '/rest/v1/nissen_recommended', { method: 'POST', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ ...payload, active: true }) });
+    }
+    if (!res.ok) throw new Error(await res.text());
+    clearRecForm();
+    await loadRecProducts();
+    alert(editId ? '已更新！' : '已新增！');
+  } catch(e) { alert('儲存失敗：' + e.message); }
+}
+
+async function toggleRecActive(id, active) {
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_recommended?id=eq.' + id, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ active, updated_at: new Date().toISOString() }) });
+    if (!res.ok) throw new Error(await res.text());
+    await loadRecProducts();
+  } catch(e) { alert('更新失敗：' + e.message); }
+}
+
+async function deleteRecProduct(id) {
+  if (!confirm('確認刪除此推薦商品？')) return;
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_recommended?id=eq.' + id, { method: 'DELETE', headers: SUPA_H });
+    if (!res.ok) throw new Error(await res.text());
+    await loadRecProducts();
+  } catch(e) { alert('刪除失敗：' + e.message); }
+}
+
+// ══════════════════════════════════════════════════
+// 📥 Nissen 代購訂單管理
+// ══════════════════════════════════════════════════
+
+let allNissenOrders = [];
+let nissenOrderFilter = 'all';
+
+async function loadNissenOrders() {
+  document.getElementById('nissenOrderList').innerHTML = '<div style="color:var(--muted);font-size:14px;">載入中…</div>';
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders?select=*&order=created_at.desc', { headers: SUPA_H });
+    allNissenOrders = await res.json();
+    const pending = allNissenOrders.filter(o => o.status === 'pending').length;
+    const badge = document.getElementById('badgeNissenOrders');
+    if (badge) { badge.textContent = pending; badge.style.display = pending ? '' : 'none'; }
+    filterNissenOrders(nissenOrderFilter);
+  } catch(e) {
+    document.getElementById('nissenOrderList').innerHTML = '<div style="color:red;font-size:13px;">載入失敗：' + e.message + '</div>';
+  }
+}
+
+function filterNissenOrders(status) {
+  nissenOrderFilter = status;
+  ['All','Pending','Paid','Done'].forEach(s => {
+    const el = document.getElementById('nissenFilter' + s);
+    if (el) el.style.background = (s.toLowerCase() === status || (s === 'Done' && status === 'confirmed')) ? 'var(--blue)' : '';
+    if (el) el.style.color = (s.toLowerCase() === status || (s === 'Done' && status === 'confirmed')) ? '#fff' : '';
+  });
+  const filtered = status === 'all' ? allNissenOrders : allNissenOrders.filter(o => o.status === status);
+  renderNissenOrders(filtered);
+}
+
+function renderNissenOrders(orders) {
+  const el = document.getElementById('nissenOrderList');
+  if (!orders.length) { el.innerHTML = '<div style="color:var(--muted);font-size:14px;">沒有訂單</div>'; return; }
+  const statusLabel = { pending:'待付款', paid:'已付款', confirmed:'已確認', cancelled:'已取消' };
+  const statusColor = { pending:'#f59e0b', paid:'#3b82f6', confirmed:'#10b981', cancelled:'#ef4444' };
+  el.innerHTML = orders.map(o => {
+    const st  = statusLabel[o.status] || o.status;
+    const clr = statusColor[o.status] || '#6b7280';
+    const isHK = (o.region || 'hk') === 'hk';
+    const currency = isHK ? 'HK$' : 'NT$';
+    const total = (o.items || []).reduce((sum, i) => {
+      const p = isHK ? (i.price_hkd || i.local || 0) : (i.price_twd || i.local || 0);
+      return sum + p * (i.qty || 1);
+    }, 0);
+    const itemNames = (o.items || []).map(i => i.name).slice(0,3).join('、') + ((o.items||[]).length > 3 ? '…' : '');
+    const date = o.created_at ? new Date(o.created_at).toLocaleDateString('zh-HK') : '';
+    return `
+      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:10px;background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+          <div>
+            <div style="font-weight:700;font-size:13px;">${o.order_no}</div>
+            <div style="font-size:12px;color:var(--muted);">${date} · ${o.region?.toUpperCase()}</div>
+          </div>
+          <span style="color:${clr};font-size:12px;font-weight:700;background:${clr}1a;padding:2px 10px;border-radius:20px;">${st}</span>
+        </div>
+        <div style="font-size:13px;margin-top:8px;"><strong>${o.customer_name}</strong> · ${o.customer_email} ${o.customer_phone ? '· ' + o.customer_phone : ''}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;">${itemNames}</div>
+        ${total ? `<div style="font-size:13px;font-weight:600;margin-top:4px;">${currency}${Math.ceil(total).toLocaleString()} <span style="font-size:10px;font-weight:400;color:var(--muted);">預估</span></div>` : ''}
+        ${o.remark ? `<div style="font-size:12px;color:#6b7280;margin-top:4px;">備注：${o.remark}</div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          <button class="btn" style="font-size:12px;padding:4px 10px;" onclick="viewNissenOrderItems(${o.id})">📋 查看明細</button>
+          ${o.status !== 'paid' && o.status !== 'confirmed' && o.status !== 'cancelled'
+            ? `<button class="btn btn-blue" style="font-size:12px;padding:4px 10px;" onclick="markNissenPaid(${o.id})">💰 標記已付款</button>`
+            : ''}
+          ${(o.status === 'paid' || o.status === 'confirmed') && o.status !== 'cancelled'
+            ? `<button class="btn btn-blue" style="font-size:12px;padding:4px 10px;" onclick="sendNissenConfirm(${o.id})">✉️ 發送確認 Email</button>`
+            : ''}
+          ${o.status !== 'cancelled'
+            ? `<button class="btn" style="font-size:12px;padding:4px 10px;color:#dc2626;" onclick="cancelNissenOrder(${o.id})">✕ 取消</button>`
+            : ''}
+        </div>
+        <div id="nissenOrderItems_${o.id}" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;"></div>
+      </div>`;
+  }).join('');
+}
+
+function viewNissenOrderItems(id) {
+  const panel = document.getElementById('nissenOrderItems_' + id);
+  if (!panel) return;
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  const order = allNissenOrders.find(o => o.id === id);
+  if (!order) return;
+  const isHK = (order.region || 'hk') === 'hk';
+  const currency = isHK ? 'HK$' : 'NT$';
+  panel.innerHTML = (order.items || []).map(item => {
+    const p = isHK ? (item.price_hkd || item.local || 0) : (item.price_twd || item.local || 0);
+    const sub = [item.color, item.size, item.desc].filter(Boolean).join(' / ');
+    return `<div style="font-size:12px;padding:4px 0;border-bottom:1px solid #f5f5f5;">
+      <span style="font-weight:600;">${item.name}</span>${sub ? ` (${sub})` : ''} ×${item.qty||1}
+      ${item.jpy ? ` — ¥${Number(item.jpy).toLocaleString()}` : ''}
+      ${p ? ` / ${currency}${Math.ceil(p).toLocaleString()}` : ''}
+      ${item.url ? ` <a href="${item.url}" target="_blank" style="color:#6d597a;font-size:11px;">🔗</a>` : ''}
+    </div>`;
+  }).join('');
+  panel.style.display = '';
+}
+
+async function markNissenPaid(id) {
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders?id=eq.' + id, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ status: 'paid' }) });
+    if (!res.ok) throw new Error(await res.text());
+    await loadNissenOrders();
+  } catch(e) { alert('更新失敗：' + e.message); }
+}
+
+async function sendNissenConfirm(id) {
+  const order = allNissenOrders.find(o => o.id === id);
+  if (!order) return;
+  if (!confirm(`確認發送確認 Email 給 ${order.customer_name}（${order.customer_email}）？`)) return;
+  try {
+    // GAS POST (no-cors：無法讀 response，樂觀顯示成功)
+    fetch(GAS, {
+      method: 'POST', mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sendNissenConfirmation', order }),
+    });
+    // 更新 Supabase 狀態
+    await fetch(SUPA_URL + '/rest/v1/nissen_orders?id=eq.' + id, {
+      method: 'PATCH',
+      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status: 'confirmed', confirmed_at: new Date().toISOString() }),
+    });
+    await loadNissenOrders();
+    alert('✅ 確認 Email 已發送，訂單狀態更新為「已確認」！');
+  } catch(e) { alert('更新失敗：' + e.message); }
+}
+
+async function cancelNissenOrder(id) {
+  if (!confirm('確認取消此 Nissen 訂單？')) return;
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders?id=eq.' + id, { method: 'PATCH', headers: { ...SUPA_H, 'Prefer': 'return=minimal' }, body: JSON.stringify({ status: 'cancelled' }) });
+    if (!res.ok) throw new Error(await res.text());
+    await loadNissenOrders();
+  } catch(e) { alert('取消失敗：' + e.message); }
 }
 
   function gasJsonp(params) {

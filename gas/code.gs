@@ -512,6 +512,21 @@ function doGet(e) {
     }
   }
 
+  // ── Nissen 訂單通知（前台下單後 fire-and-forget，通知 admin）──
+  if (action === "nissenOrderNotify") {
+    try {
+      var orderStr = param.orderJson ? param.orderJson : "{}";
+      var nOrder = {};
+      try { nOrder = JSON.parse(orderStr); } catch(pe) {}
+      if (nOrder.order_no || nOrder.orderNo) {
+        var nSubject = "[新 Nissen 代購訂單] " + (nOrder.order_no || nOrder.orderNo) + " — " + (nOrder.customer_name || nOrder.customerName || "") + " (" + (nOrder.region || "").toUpperCase() + ")";
+        var nBody = buildNissenEmailHtml_(nOrder, false);
+        MailApp.sendEmail({ to: MY_NOTIFICATION_EMAIL, subject: nSubject, htmlBody: nBody });
+      }
+    } catch(ne) { Logger.log("nissenOrderNotify error: " + ne); }
+    return jsonpOrJson_(param, { result: "ok" });
+  }
+
   // 🛒 【分流 4】下單前台：兼容 action=getItems、event=、sheetName= 三種方式
   var targetSheetName = param.event ? param.event : (param.sheetName ? param.sheetName : "");
   
@@ -1821,6 +1836,25 @@ function doPost(e) {
       }
       return ContentService.createTextOutput(JSON.stringify({ result: "success", updated: updates.length }))
                            .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── Nissen 代購訂單確認 email（admin 從 admin panel 觸發）──
+    if (rowData.action === "sendNissenConfirmation") {
+      try {
+        var cnOrder = rowData.order || {};
+        if (!cnOrder.customer_email || !cnOrder.order_no) {
+          return ContentService.createTextOutput(JSON.stringify({ result: "error", message: "缺少 order 資料" }))
+                               .setMimeType(ContentService.MimeType.JSON);
+        }
+        var cnSubject = "[852hk.81jp] 訂單確認 " + cnOrder.order_no;
+        var cnBody = buildNissenEmailHtml_(cnOrder, true);
+        MailApp.sendEmail({ to: cnOrder.customer_email, subject: cnSubject, htmlBody: cnBody });
+        return ContentService.createTextOutput(JSON.stringify({ result: "ok" }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      } catch(cnErr) {
+        return ContentService.createTextOutput(JSON.stringify({ result: "error", message: cnErr.toString() }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
     }
 
     // ── 功能 4：消費者下單 ────────────────────────────────────────────
@@ -5797,6 +5831,7 @@ function debugPurchaseSheet() {
   });
 
   // 測試 getEventPurchaseSheet 能否找到特定活動
+  // placeholder — do not remove
   Logger.log("\n=== 測試 getEventPurchaseSheet ===");
   // 列出所有非 Data / 非 system 的 sheet 名稱
   var EXCL = ["訂單紀錄","易寄取地址","Blank","收單截止時間","購貨紀錄","盈利紀錄"];
@@ -5816,5 +5851,100 @@ function debugPurchaseSheet() {
       Logger.log("❌ " + evName + " → " + targetName + " 找不到!");
     }
   });
+}
+
+// =================================================================
+// Nissen 代購 Email 模板
+// =================================================================
+function buildNissenEmailHtml_(order, isConfirmation) {
+  var isHK = (order.region || "hk").toLowerCase() !== "tw";
+  var currency = isHK ? "HK$" : "NT$";
+  var items = order.items || [];
+  var totalLocal = 0;
+
+  var itemsHtml = "";
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var localPrice = isHK ? (it.price_hkd || it.local || 0) : (it.price_twd || it.local || 0);
+    var qty = it.qty || 1;
+    var subtotal = localPrice * qty;
+    totalLocal += subtotal;
+    var sub = [it.color, it.size, it.desc].filter(Boolean).join(" / ");
+    var imgHtml = (it.image_url || it.image)
+      ? "<img src=\"" + (it.image_url || it.image) + "\" style=\"width:48px;height:48px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;\">"
+      : "";
+    itemsHtml += "<tr>" +
+      "<td style=\"padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;\">" +
+        imgHtml + "<span>" + it.name + (sub ? "<br><span style=\"font-size:11px;color:#888;\">" + sub + "</span>" : "") + "</span>" +
+      "</td>" +
+      "<td style=\"padding:10px 8px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:center;color:#555;\">" + qty + "</td>" +
+      "<td style=\"padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;\">" +
+        (localPrice ? currency + Math.ceil(subtotal).toLocaleString() : "—") + "</td>" +
+    "</tr>";
+  }
+
+  var payBlock = "";
+  if (!isConfirmation) {
+    // 通知 admin 的版本：簡潔顯示資料，admin 直接進 admin panel 處理
+    payBlock = "<div style=\"background:#fffbeb;border-left:4px solid #f59e0b;padding:14px;border-radius:4px;margin-top:16px;font-size:13px;color:#92400e;\">" +
+      "<p style=\"margin:0 0 6px;font-weight:700;\">🔔 新訂單通知</p>" +
+      "<p style=\"margin:0;\">請到 <a href=\"" + ADMIN_PAGE_URL + "\" style=\"color:#d97706;\">Admin Panel</a> 查看訂單並跟進付款。</p>" +
+    "</div>";
+  } else {
+    // 確認 email 給客人
+    if (isHK) {
+      payBlock = "<div style=\"background:#f0f7ff;border-left:4px solid #0066cc;padding:14px;border-radius:4px;margin-top:16px;font-size:13px;color:#1e3a5f;\">" +
+        "<p style=\"margin:0 0 8px;font-weight:700;\">💰 付款方式（如未付款請盡快完成）</p>" +
+        "<p style=\"margin:0 0 4px;\">PayMe：<a href=\"https://payme.hsbc/miru\" style=\"color:#ef4444;font-weight:600;\">payme.hsbc/miru</a></p>" +
+        "<p style=\"margin:0;\">轉數快 (FPS)：<strong>8890873</strong>（Chow W. Y.）</p>" +
+        "<p style=\"margin:8px 0 0;font-size:12px;color:#555;\">⚠️ 付款時請於備注填寫訂單號：<strong>" + order.order_no + "</strong></p>" +
+      "</div>";
+    } else {
+      payBlock = "<div style=\"background:#f0fff4;border-left:4px solid #38a169;padding:14px;border-radius:4px;margin-top:16px;font-size:13px;color:#276749;\">" +
+        "<p style=\"margin:0 0 8px;font-weight:700;\">💰 付款方式</p>" +
+        "<p style=\"margin:0;\">請私訊我們 IG <strong>@886tw.81jp</strong> 或 Threads 索取付款資訊</p>" +
+        "<p style=\"margin:8px 0 0;font-size:12px;color:#555;\">⚠️ 付款時請告知訂單號：<strong>" + order.order_no + "</strong></p>" +
+      "</div>";
+    }
+  }
+
+  var greeting = isConfirmation
+    ? "<p style=\"font-size:14px;\">您好 " + (order.customer_name || "") + "，</p><p style=\"font-size:14px;margin-top:6px;\">感謝您的訂購！" + (isHK ? "我哋" : "我們") + "已收到您的代購申請，以下是訂單確認資料。</p>"
+    : "<p style=\"font-size:14px;\">收到新 Nissen 代購訂單，客戶資料如下：</p>";
+
+  return "<div style=\"font-family:Helvetica Neue,Helvetica,Arial,sans-serif;max-width:580px;margin:0 auto;color:#333;line-height:1.6;padding:20px;background:#fafafa;\">" +
+    "<h2 style=\"font-size:17px;font-weight:600;border-bottom:1px solid #e5e5e5;padding-bottom:12px;color:#111;\">" +
+      (isConfirmation ? "✅ " : "📥 ") + "Nissen 代購訂單 — " + order.order_no +
+    "</h2>" +
+    greeting +
+    "<div style=\"background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:14px;margin:14px 0;font-size:13px;line-height:1.8;\">" +
+      "<strong>姓名：</strong>" + (order.customer_name || "—") + "<br>" +
+      "<strong>Email：</strong>" + (order.customer_email || "—") + "<br>" +
+      "<strong>電話：</strong>" + (order.customer_phone || "—") + "<br>" +
+      "<strong>地區：</strong>" + (isHK ? "香港" : "台灣") + "<br>" +
+      (order.remark ? "<strong>備注：</strong>" + order.remark : "") +
+    "</div>" +
+    "<h3 style=\"font-size:14px;font-weight:700;margin:16px 0 10px;color:#444;\">📋 訂購清單</h3>" +
+    "<table style=\"width:100%;border-collapse:collapse;background:#fff;border:1px solid #eee;border-radius:6px;overflow:hidden;\">" +
+      "<thead><tr style=\"background:#f7f7f7;\">" +
+        "<th style=\"padding:8px 12px;text-align:left;font-size:12px;color:#666;\">商品</th>" +
+        "<th style=\"padding:8px;text-align:center;font-size:12px;color:#666;width:50px;\">數量</th>" +
+        "<th style=\"padding:8px 12px;text-align:right;font-size:12px;color:#666;width:80px;\">小計</th>" +
+      "</tr></thead>" +
+      "<tbody>" + itemsHtml + "</tbody>" +
+    "</table>" +
+    "<p style=\"text-align:right;font-size:15px;font-weight:700;margin-top:12px;\">" +
+      "預計總金額：<span style=\"color:#c62828;\">" + (totalLocal ? currency + Math.ceil(totalLocal).toLocaleString() : "待確認") + "</span>" +
+    "</p>" +
+    "<p style=\"font-size:11px;color:#aaa;margin-top:0;\">※ 不含國際運費，最終以實際費用為準</p>" +
+    payBlock +
+    "<div style=\"margin-top:24px;padding-top:14px;border-top:1px dashed #ddd;font-size:12px;color:#999;\">" +
+      (isConfirmation
+        ? (isHK
+          ? "<p>如有任何問題，歡迎直接回覆此 Email 或到 IG / Threads inbox 我哋查詢，謝謝！</p>"
+          : "<p>如有任何問題，歡迎直接回覆此 Email 或 IG @886tw.81jp 私訊查詢，謝謝！</p>")
+        : "<p>852hk.81jp Admin Panel 自動通知</p>") +
+    "</div>" +
+  "</div>";
 }
 

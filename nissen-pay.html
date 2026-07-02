@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>付款 — 852hk.81jp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f7f6f3; --card: #fff; --ink: #1a1a1a; --muted: #888;
+      --border: #e8e6e1; --green: #10b981; --red: #c62828;
+    }
+    body { font-family: 'Noto Sans HK', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+    .wrap { max-width: 560px; margin: 0 auto; padding: 24px 16px 60px; }
+    .topbar { text-align: center; padding: 16px 0 20px; }
+    .brand { font-size: 16px; font-weight: 600; letter-spacing: 3px; color: var(--ink); text-decoration: none; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+    .status-banner { border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center; }
+    .status-banner.success { background: #d1fae5; border: 1px solid #a7f3d0; }
+    .status-banner .icon { font-size: 32px; margin-bottom: 8px; }
+    .status-banner h1 { font-size: 18px; font-weight: 700; color: #065f46; }
+    .status-banner p { font-size: 13px; color: #047857; margin-top: 6px; }
+    .order-no { font-size: 13px; background: #f3f4f6; padding: 6px 14px; border-radius: 20px; display: inline-block; margin-top: 10px; font-weight: 600; letter-spacing: 1px; color: #374151; }
+    .section-title { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+    .item-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .item-row:last-child { border-bottom: none; }
+    .item-img { width: 48px; height: 48px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--bg); border: 1px solid var(--border); }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-size: 13px; font-weight: 500; }
+    .item-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .item-price { font-size: 13px; color: #374151; white-space: nowrap; text-align: right; }
+    .total-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0 0; font-weight: 700; font-size: 15px; }
+    .total-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .pay-method { border: 2px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; cursor: pointer; transition: border-color 0.2s; }
+    .pay-method.selected { border-color: #3b82f6; background: #eff6ff; }
+    .pay-method-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .pay-detail { font-size: 13px; color: #374151; line-height: 1.7; }
+    .pay-detail strong { color: var(--ink); }
+    .qr-img { width: 140px; height: 140px; border-radius: 8px; border: 1px solid var(--border); display: block; margin: 10px auto; object-fit: contain; background: #f9f9f9; }
+    .remark-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px; font-size: 12px; color: #92400e; line-height: 1.6; margin-top: 8px; }
+    .contact-links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+    .contact-link { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--ink); text-decoration: none; font-weight: 500; }
+    .loading { text-align: center; padding: 40px; color: var(--muted); }
+    .back-link { display: block; text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); text-decoration: none; }
+    .back-link:hover { color: var(--ink); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/" class="brand">852hk.81jp</a>
+  </div>
+
+  <div id="loadingWrap" class="loading">⏳ 載入訂單資料中…</div>
+  <div id="pageContent" style="display:none;"></div>
+</div>
+
+<script>
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+const SUPA_H = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
+
+// 付款配置 — 可在此更改
+const PAY_CONFIG = {
+  hk: {
+    payme: {
+      label: 'PayMe',
+      link: 'https://payme.hsbc/miru',
+      qr: '',        // 放 PayMe QR code 圖片 URL（留空則不顯示圖片）
+      detail: '一按即 PayMe：<a href="https://payme.hsbc/miru" style="color:#ef4444;font-weight:600;">payme.hsbc/miru</a>',
+    },
+    fps: {
+      label: '轉數快 (FPS)',
+      link: '',
+      qr: '',        // 放 FPS QR code 圖片 URL
+      detail: '轉數快號碼：<strong>8890873</strong><br>帳戶持有人：<strong>Chow W. Y.</strong>',
+    },
+  },
+  tw: {
+    linepay: {
+      label: 'LINE Pay',
+      link: '',
+      qr: '',        // 放 LINE Pay QR code 圖片 URL
+      detail: '請私訊我們索取 LINE Pay 付款連結',
+    },
+    transfer: {
+      label: '銀行轉帳',
+      link: '',
+      qr: '',
+      detail: '請私訊我們索取銀行帳號',
+    },
+  },
+};
+
+const CONTACT = {
+  hk: { ig: 'https://ig.me/m/852hk.81jp', igLabel: '@852hk.81jp', wa: 'https://wa.me/85293375712' },
+  tw: { ig: 'https://ig.me/m/886tw.81jp', igLabel: '@886tw.81jp', wa: '' },
+};
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  const orderNo = params.get('id');
+  const region  = params.get('r') || 'hk';
+
+  if (!orderNo) {
+    document.getElementById('loadingWrap').innerHTML = '<p style="color:#c62828;padding:40px;text-align:center;">❌ 缺少訂單號碼，請重新下單。</p>';
+    return;
+  }
+
+  // 優先讀 localStorage（即時顯示，不需等 Supabase）
+  let order = null;
+  try {
+    const cached = localStorage.getItem('nissenOrder_' + orderNo);
+    if (cached) order = JSON.parse(cached);
+  } catch(e) {}
+
+  // 再從 Supabase 讀取確認
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/nissen_orders?order_no=eq.${encodeURIComponent(orderNo)}&select=*`, { headers: SUPA_H });
+    const rows = await res.json();
+    if (rows && rows[0]) order = { ...order, ...rows[0] };
+  } catch(e) {}
+
+  document.getElementById('loadingWrap').style.display = 'none';
+  document.getElementById('pageContent').style.display = '';
+
+  if (!order) {
+    document.getElementById('pageContent').innerHTML = `<p style="color:#c62828;text-align:center;">❌ 找不到訂單 ${orderNo}，請聯絡我們確認。</p>`;
+    return;
+  }
+
+  const r = order.region || region;
+  const isHK = r === 'hk';
+  const currency = isHK ? 'HK$' : 'NT$';
+  const items = order.items || [];
+
+  const payMethods = PAY_CONFIG[r] || PAY_CONFIG.hk;
+  const contact = CONTACT[r] || CONTACT.hk;
+
+  const itemsHtml = items.map(item => {
+    const imgSrc = item.image_url || item.image || '';
+    const sub = [item.color, item.size, item.desc].filter(Boolean).join(' / ');
+    const localPrice = isHK ? (item.price_hkd || item.local || 0) : (item.price_twd || item.local || 0);
+    return `
+      <div class="item-row">
+        ${imgSrc ? `<img class="item-img" src="${imgSrc}" onerror="this.style.display='none'">` : ''}
+        <div class="item-info">
+          <div class="item-name">${item.name}${item.qty > 1 ? ` ×${item.qty}` : ''}</div>
+          ${sub ? `<div class="item-sub">${sub}</div>` : ''}
+          ${item.jpy ? `<div class="item-sub">¥${Number(item.jpy).toLocaleString()}</div>` : ''}
+        </div>
+        <div class="item-price">${localPrice ? `${currency}${Number(localPrice * (item.qty || 1)).toLocaleString()}` : '—'}</div>
+      </div>`;
+  }).join('');
+
+  const totalLocal = items.reduce((sum, i) => {
+    const p = isHK ? (i.price_hkd || i.local || 0) : (i.price_twd || i.local || 0);
+    return sum + p * (i.qty || 1);
+  }, 0);
+
+  const payHtml = Object.entries(payMethods).map(([key, pm]) => `
+    <div class="pay-method" onclick="selectPayMethod('${key}', this)">
+      <div class="pay-method-title">${pm.label}</div>
+      ${pm.qr ? `<img class="qr-img" src="${pm.qr}" alt="${pm.label} QR code">` : ''}
+      <div class="pay-detail">${pm.detail}</div>
+    </div>`).join('');
+
+  const igWaHtml = `
+    <div class="contact-links">
+      <a class="contact-link" href="${contact.ig}" target="_blank">📩 IG ${contact.igLabel}</a>
+      ${contact.wa ? `<a class="contact-link" href="${contact.wa}" target="_blank">💬 WhatsApp</a>` : ''}
+    </div>`;
+
+  document.getElementById('pageContent').innerHTML = `
+    <div class="status-banner success">
+      <div class="icon">✅</div>
+      <h1>訂單已收到！</h1>
+      <p>我們會在確認收款後盡快為您代購</p>
+      <div class="order-no">訂單號 ${order.order_no}</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">訂購清單</div>
+      ${itemsHtml}
+      <div class="total-row">
+        <span>預計總金額</span>
+        <span>${totalLocal ? currency + Math.ceil(totalLocal).toLocaleString() : '待確認'}</span>
+      </div>
+      <div class="total-note">※ 以上為預估金額，實際費用以最終確認為準（含國際運費）</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">付款方式</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">請選擇您的付款方式，轉帳時務必在備注填寫訂單號 <strong>${order.order_no}</strong></p>
+      ${payHtml}
+      <div class="remark-box">
+        ⚠️ 收到款項後我們才會開始代購，請盡快完成付款。如有任何問題，請直接聯絡我們。
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">聯絡我們</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">付款後請傳截圖給我們確認，或有任何問題歡迎直接聯絡</p>
+      ${igWaHtml}
+    </div>
+
+    <a href="/" class="back-link">← 返回首頁</a>
+  `;
+}
+
+function selectPayMethod(key, el) {
+  document.querySelectorAll('.pay-method').forEach(m => m.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+init();
+</script>
+</body>
+</html>
