@@ -377,9 +377,36 @@
     .order-cards { display: flex; flex-direction: column; gap: 12px; }
     .ocard {
       background: var(--card); border: 1px solid var(--border);
-      border-radius: 12px; overflow: hidden;
+      border-radius: 12px; overflow: visible;
       transition: box-shadow 0.2s;
     }
+    /* ── 訂單卡片操作選單（⋯）── */
+    .ocard-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .ocard-menu-wrap { position: relative; }
+    .ocard-menu-btn {
+      width: 28px; height: 28px; border: 1px solid var(--border); background: none;
+      border-radius: 8px; cursor: pointer; font-size: 15px; line-height: 1;
+      color: var(--muted); transition: all 0.15s; padding: 0;
+    }
+    .ocard-menu-btn:hover, .ocard-menu-btn.open { border-color: var(--ink); color: var(--ink); background: #f7f6f3; }
+    .ocard-menu {
+      position: absolute; right: 0; top: 32px; background: #fff;
+      border: 1px solid var(--border); border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.14); min-width: 160px;
+      z-index: 60; display: none; overflow: hidden;
+    }
+    .ocard-menu.open { display: block; }
+    .ocard-menu-item {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      padding: 10px 14px; background: none; border: none;
+      font-size: 12px; font-weight: 600; color: #374151;
+      cursor: pointer; text-align: left; font-family: inherit; transition: background 0.1s;
+    }
+    .ocard-menu-item:hover { background: #f7f6f3; }
+    .ocard-menu-item.danger { color: var(--danger); }
+    .ocard-menu-item + .ocard-menu-item { border-top: 1px solid #f3f4f6; }
+    .ocard-menu-item:disabled { opacity: 0.5; cursor: not-allowed; }
+    .ocard-menu-item.sent { color: var(--success); }
     .ocard:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
     .ocard.overdue-card { border-color: #fca5a5; }
     .ocard-top {
@@ -1678,6 +1705,22 @@ function fetchOrders() {
     });
 }
 
+// ── 訂單卡片 ⋯ 選單 ──
+function toggleOcardMenu(btn, ev) {
+  ev.stopPropagation();
+  const menu = btn.nextElementSibling;
+  const wasOpen = menu.classList.contains('open');
+  closeAllOcardMenus();
+  if (!wasOpen) { menu.classList.add('open'); btn.classList.add('open'); }
+}
+function closeAllOcardMenus() {
+  document.querySelectorAll('.ocard-menu.open').forEach(m => m.classList.remove('open'));
+  document.querySelectorAll('.ocard-menu-btn.open').forEach(b => b.classList.remove('open'));
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ocard-menu-wrap')) closeAllOcardMenus();
+});
+
 function renderOrders(orders, bodyId, region, cls) {
   const loading = document.getElementById('loading'+region);
   const wrap = document.getElementById('wrap'+region);
@@ -1823,24 +1866,44 @@ function renderOrders(orders, bodyId, region, cls) {
       pickupName: order.pickupName || '', pickupAddress: order.pickupAddress || '',
       status: order.status || '', remark: order.remark || ''
     }));
+    // ── 主要動作（依狀態最多顯示 1-2 粒）＋ 其餘收入 ⋯ 選單 ──
+    let primaryActions = '';
+    if (cls === 'tw' && order.status === '已下單') {
+      primaryActions += `<input type="checkbox" class="order-checkbox bulk-check" data-oid="${order.id}" data-region="${cls}" onchange="updateBulkBar('${cls}')"> <button class="printed-btn" data-oid="${order.id}" onclick="markStatus(this.dataset.oid,'已印單',this)">🖨️ 已印單</button>`;
+    }
+    if (cls === 'tw' && order.status === '已印單') {
+      primaryActions += `<input type="checkbox" class="order-checkbox bulk-check" data-oid="${order.id}" data-region="${cls}" onchange="updateBulkBar('${cls}')"> <button class="dispatched-btn" data-oid="${order.id}" onclick="markStatus(this.dataset.oid,'已出貨',this)">📬 已出貨</button>`;
+    }
+    if (cls === 'tw' && (order.status === '已到貨' || order.status === '已通知')) {
+      primaryActions += `<button class="arrival-notify-btn" data-oid="${order.id}" onclick="sendArrivalNotification(this.dataset.oid, this)">🎉 到貨通知</button>`;
+    }
+
+    let menuItems = `<button class="ocard-menu-item edit-order-btn" data-oid="${order.id}" onclick="closeAllOcardMenus(); toggleEditMode(this.dataset.oid)">✏️ 編輯訂單</button>`;
+    if (!isPaid) {
+      menuItems += `
+        <button class="ocard-menu-item" data-oid="${order.id}" onclick="resendPendingEmail(this.dataset.oid, this)">✉️ 重發確認信</button>
+        <button class="ocard-menu-item" data-oid="${order.id}" onclick="sendManualReminder(this.dataset.oid, this)">⚠️ 發送催款信</button>`;
+    }
+    if (isPaid) {
+      menuItems += `<button class="ocard-menu-item" onclick="closeAllOcardMenus(); openStockoutModal('${order.id}')">📦 缺貨通知</button>`;
+    }
+    if (order.status !== '已完結' && order.status !== '已取消') {
+      menuItems += `<button class="ocard-menu-item danger" data-oid="${order.id}" data-sum="${encodeURIComponent(order.summary || '')}" onclick="closeAllOcardMenus(); openCancelModal(this.dataset.oid, decodeURIComponent(this.dataset.sum))">✕ 取消訂單</button>`;
+    }
+
     card.innerHTML = `
       <div class="ocard-top">
         <span class="ocard-date${overdue ? ' overdue' : ''}">${fmtDate}${overdue ? ' ⚠️' : ''}</span>
-        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <button class="edit-order-btn" data-oid="${order.id}" onclick="toggleEditMode(this.dataset.oid)">✏️ 編輯</button>
-          ${!isPaid ? `
-            <button class="resend-btn" data-oid="${order.id}" onclick="resendPendingEmail(this.dataset.oid, this)">重發確認信</button>
-            <button class="reminder-btn" data-oid="${order.id}" onclick="sendManualReminder(this.dataset.oid, this)">⚠️ 催款</button>
-          ` : ''}
-          ${isPaid ? `<button class="stockout-inquiry-btn" onclick="openStockoutModal('${order.id}')">📦 缺貨通知</button>` : ''}
-          ${cls === 'tw' && (order.status === '已到貨' || order.status === '已通知') ? `<button class="arrival-notify-btn" data-oid="${order.id}" onclick="sendArrivalNotification(this.dataset.oid, this)">🎉 到貨通知</button>` : ''}
-          ${cls === 'tw' && order.status === '已下單' ? `<input type="checkbox" class="order-checkbox bulk-check" data-oid="${order.id}" data-region="${cls}" onchange="updateBulkBar('${cls}')"> <button class="printed-btn" data-oid="${order.id}" onclick="markStatus(this.dataset.oid,'已印單',this)">🖨️ 已印單</button>` : ''}
-          ${cls === 'tw' && order.status === '已印單' ? `<input type="checkbox" class="order-checkbox bulk-check" data-oid="${order.id}" data-region="${cls}" onchange="updateBulkBar('${cls}')"> <button class="dispatched-btn" data-oid="${order.id}" onclick="markStatus(this.dataset.oid,'已出貨',this)">📬 已出貨</button>` : ''}
-          ${order.status !== '已完結' && order.status !== '已取消' ? `<button class="cancel-order-btn" data-oid="${order.id}" data-sum="${encodeURIComponent(order.summary || '')}" onclick="openCancelModal(this.dataset.oid, decodeURIComponent(this.dataset.sum))">取消訂單</button>` : ''}
+        <div class="ocard-actions">
+          ${primaryActions}
           <button id="btn-${order.id}" class="ocard-status-btn ${isPaid ? 'paid' : 'unpaid'}"
             ${isPaid ? 'disabled' : `onclick="confirmPayment('${order.id}')"`}>
             ${isPaid ? '✓ 已收款' : '確認收款 💰'}
           </button>
+          <div class="ocard-menu-wrap">
+            <button class="ocard-menu-btn" onclick="toggleOcardMenu(this, event)" title="更多操作">⋯</button>
+            <div class="ocard-menu">${menuItems}</div>
+          </div>
         </div>
       </div>
       <div class="ocard-body">
@@ -3625,7 +3688,7 @@ function exitEditMode(card) {
   const form = card.querySelector('.ocard-edit-form');
   if (form) form.remove();
   const editBtn = card.querySelector('.edit-order-btn');
-  if (editBtn) editBtn.innerText = '✏️ 編輯';
+  if (editBtn) editBtn.innerText = '✏️ 編輯訂單';
 }
 
 function onEditEmailInput(input, orderId) {
@@ -4521,15 +4584,15 @@ function sendManualReminder(orderId, btn) {
     body: JSON.stringify({ action: 'sendManualReminder', orderId })
   }).then(() => {
     btn.innerText = '✓ 已發送';
-    btn.className = 'reminder-btn sent';
+    btn.classList.add('sent');
     btn.disabled = false;
     setTimeout(() => {
-      btn.innerText = '⚠️ 催款';
-      btn.className = 'reminder-btn';
+      btn.innerText = '⚠️ 發送催款信';
+      btn.classList.remove('sent');
     }, 3000);
   }).catch(err => {
     alert('❌ 發送失敗，請重試。');
-    btn.innerText = '⚠️ 催款';
+    btn.innerText = '⚠️ 發送催款信';
     btn.disabled = false;
   });
 }
@@ -4537,7 +4600,6 @@ function sendManualReminder(orderId, btn) {
 function resendPendingEmail(orderId, btn) {
   if (!confirm('確定要重新發送訂單 ' + orderId + ' 的待付款確認信嗎？')) return;
   btn.innerText = '發送中...';
-  btn.className = 'resend-btn sending';
   btn.disabled = true;
   fetch(GAS, {
     method: 'POST', mode: 'no-cors',
@@ -4545,16 +4607,15 @@ function resendPendingEmail(orderId, btn) {
     body: JSON.stringify({ action: 'resendPendingEmail', orderId })
   }).then(() => {
     btn.innerText = '✓ 已發送';
-    btn.className = 'resend-btn sent';
+    btn.classList.add('sent');
     btn.disabled = false;
     setTimeout(() => {
-      btn.innerText = '重發確認信';
-      btn.className = 'resend-btn';
+      btn.innerText = '✉️ 重發確認信';
+      btn.classList.remove('sent');
     }, 3000);
   }).catch(err => {
     alert('❌ 發送失敗，請重試。');
-    btn.innerText = '重發確認信';
-    btn.className = 'resend-btn';
+    btn.innerText = '✉️ 重發確認信';
     btn.disabled = false;
     console.error(err);
   });
