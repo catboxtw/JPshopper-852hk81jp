@@ -602,7 +602,13 @@ function shopApp() {
     changeQty(id, sub, amt) {
       const key = id+'_'+sub;
       if (!this.cart[key]) return;
-      this.cart[key].qty = Math.max(1, this.cart[key].qty + amt);
+      let next = Math.max(1, this.cart[key].qty + amt);
+      if (amt > 0) {
+        const product = this.products.find(p => p.id === id);
+        const rem = product ? this.remaining(product, sub) : null;
+        if (rem !== null && next > rem) next = Math.max(1, rem); // 不可超過剩餘庫存
+      }
+      this.cart[key].qty = next;
       this.cart = {...this.cart};
     },
     get cartItems() { return Object.values(this.cart); },
@@ -616,6 +622,28 @@ function shopApp() {
       }
       if (this.cartItems.length===0 || !this.form.name.trim() || !/^\d{10}$/.test(this.form.phone) || !this.form.email.trim()) {
         alert('請確認所有必填欄位（姓名、手機號碼、電子信箱）及已勾選商品。'); return;
+      }
+      // 送出前重新核對庫存，超出剩餘數量就調整購物車並中止
+      try {
+        const evName = encodeURIComponent(this.sheetEventName);
+        const qtyData = await sbGet(`ordered_qty?event_name=eq.${evName}&select=product_name,sub_name,qty_ordered`);
+        this.orderedQty = buildOrderedQty(qtyData);
+      } catch(e) {}
+      const overs = [];
+      this.cartItems.forEach(item => {
+        const product = this.products.find(p => p.id === item.id);
+        if (!product) return;
+        const rem = this.remaining(product, item.sub);
+        if (rem !== null && item.qty > rem) {
+          overs.push(`・${item.name}${item.sub ? '（'+item.sub+'）' : ''}：剩餘 ${rem} 件`);
+          const key = item.id + '_' + item.sub;
+          if (rem <= 0) delete this.cart[key]; else this.cart[key].qty = rem;
+        }
+      });
+      if (overs.length) {
+        this.cart = {...this.cart};
+        alert('抱歉，以下商品庫存不足，已為您調整購物車，請確認後再送出：\n\n' + overs.join('\n'));
+        return;
       }
       this.submitting = true;
       // 新格式：ProductName {Sub} [xQty]（款式用{}，數量用[]）
