@@ -61,10 +61,18 @@ if (!urls.length) {
 function extractInPage(debugMode) {
   const PRICE_RE = /(?:[¥￥]\s*([0-9][0-9,]*)|([0-9][0-9,]*)\s*円)/;
 
-  // 商品標籤：最緊要係分清「網購限定」定「會場限定」
-  // （會場限定＝要有人親身去買；網購限定＝可以直接落單寄出）
+  // 商品標籤 — ⚠️ 「限定」同「対象」意思差好遠，一定要分清楚：
+  //   オンライン限定      → 淨係網上有，現場買唔到       （--venue-only 會剔走）
+  //   オンライン販売対象  → 呢件貨都有得網上賣，現場一般都有（保留）
+  //   オンライン販売対象外 → 唔上網賣，即係淨係現場有     （保留，等同會場限定）
   const TAG_PATTERNS = [
+    // 先判斷「対象外」，唔好俾下面條「対象」搶咗去
+    { re: /オンライン(ストア|ショップ)?(販売)?対象外|店頭(販売)?のみ|会場(販売)?のみ|オンライン(販売)?(不可|なし)/,
+                                                                                          tag: '🏬會場限定' },
     { re: /オンライン(ストア|ショップ)?限定|ONLINE\s?限定|WEB\s?限定|ウェブ限定|通販限定/i, tag: '🌐網購限定' },
+    // 「販売対象」＝都有得網上賣，唔代表現場冇，所以淨係做參考標示
+    { re: /オンライン(ストア|ショップ)?(販売)?対象(?!外)|オンライン(ストア|ショップ)?(でも)?(取扱|販売中)/,
+                                                                                          tag: '🛒網上都有' },
     { re: /パーク限定|会場限定|店舗限定|館内限定|ここでしか|現地限定/,                      tag: '🏬會場限定' },
     { re: /予約(商品|受付|販売)|受注生産|お取り寄せ/,                                      tag: '預訂商品' },
     { re: /SOLD\s?OUT|完売|品切れ|在庫(なし|切れ)/i,                                       tag: '⛔售罄' },
@@ -158,7 +166,8 @@ function extractInPage(debugMode) {
 
     // 標籤 + 每人限購：卡入面同所屬分類標題都掃一次
     const scanText = clean(card.textContent) + ' ' + category;
-    const tags = TAG_PATTERNS.filter(t => t.re.test(scanText)).map(t => t.tag);
+    // 去重：🏬會場限定 有兩條 pattern（対象外 / パーク限定）會夾到同一件貨
+    const tags = [...new Set(TAG_PATTERNS.filter(t => t.re.test(scanText)).map(t => t.tag))];
     const lm = scanText.match(LIMIT_RE);
     const limitPerPerson = lm ? parseInt(toHalfWidth(lm[1]), 10) || '' : '';
 
@@ -331,26 +340,36 @@ async function scrapeBrowser(url) {
   });
 
   // ── 只留會場買得到嘅商品 ──────────────────────────────────
+  // ⚠️ 只有「オンライン限定」先算現場買唔到；「オンライン販売対象」
+  //    只係話佢都有得網上賣，現場一般照樣有，所以唔會剔走。
   const isOnlineOnly = p => (p.tags || []).includes('🌐網購限定');
   const isVenue      = p => (p.tags || []).includes('🏬會場限定');
+  const alsoOnline   = p => (p.tags || []).includes('🛒網上都有');
 
   if (VENUE_ONLY) {
     const before   = products.length;
     const online   = products.filter(isOnlineOnly).length;
     const venue    = products.filter(p => isVenue(p) && !isOnlineOnly(p)).length;
-    const untagged = products.filter(p => !isVenue(p) && !isOnlineOnly(p)).length;
+    const both     = products.filter(p => alsoOnline(p) && !isVenue(p) && !isOnlineOnly(p)).length;
+    const untagged = products.filter(p => !isVenue(p) && !isOnlineOnly(p) && !alsoOnline(p)).length;
 
     products = STRICT_VENUE
       ? products.filter(p => isVenue(p) && !isOnlineOnly(p))   // 淨係要明確標住會場限定
-      : products.filter(p => !isOnlineOnly(p));                // 剔走網購限定，其餘照留
+      : products.filter(p => !isOnlineOnly(p));                // 只剔走「網購限定」，其餘照留
 
     console.log(`\n🏬 只保留會場買得到嘅商品${STRICT_VENUE ? '（嚴格模式）' : ''}：`);
-    console.log(`     🏬 明確標住會場限定　${venue} 件　→ 保留`);
-    console.log(`     ⬜ 冇任何限定標示　　${untagged} 件　→ ${STRICT_VENUE ? '剔走（嚴格模式）' : '保留（喺場一般買到）'}`);
-    console.log(`     🌐 網購限定　　　　　${online} 件　→ 剔走`);
+    console.log(`     🏬 會場限定／唔上網賣　${venue} 件　→ 保留`);
+    console.log(`     🛒 網上都有（販売対象）${both} 件　→ ${STRICT_VENUE ? '剔走（嚴格模式）' : '保留（現場一般都有）'}`);
+    console.log(`     ⬜ 冇任何標示　　　　　${untagged} 件　→ ${STRICT_VENUE ? '剔走（嚴格模式）' : '保留（喺場一般買到）'}`);
+    console.log(`     🌐 網購限定（唯一剔走）${online} 件　→ 剔走`);
     console.log(`     ${before} 件 → 保留 ${products.length} 件`);
-    if (!STRICT_VENUE && untagged) {
-      console.log(`     💡 想淨係要明確標住「會場限定」嗰 ${venue} 件，加 --strict-venue 再行一次。`);
+
+    if (STRICT_VENUE && (both || untagged)) {
+      console.log(`     ⚠️  嚴格模式剔走咗 ${both + untagged} 件冇明確標「会場限定」嘅貨。`);
+      console.log(`         如果個網站係用「オンライン販売対象」嚟標示（即係反過嚟講），`);
+      console.log(`         咁冇標嗰啲先至係現場限定，唔應該剔 —— 除去 --strict-venue 再行。`);
+    } else if (!STRICT_VENUE && venue) {
+      console.log(`     💡 想淨係要明確標住「会場限定」嗰 ${venue} 件，加 --strict-venue。`);
     }
   }
 
