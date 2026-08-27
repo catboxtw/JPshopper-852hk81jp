@@ -161,11 +161,14 @@ function extractInPage(debugMode) {
     const link = a ? a.href : '';
 
     // 分類：喺文件順序上，排喺呢張卡之前嘅最後一個區塊標題
+    // （略過純符號嘅「標題」，例如下拉箭嘴「▼」）
     let category = '';
     for (const h of sectionHeadings) {
       // 4 = DOCUMENT_POSITION_FOLLOWING（即 card 排喺 h 之後）
-      if (h.compareDocumentPosition(card) & 4) category = clean(h.textContent).slice(0, 40);
-      else break;
+      if (h.compareDocumentPosition(card) & 4) {
+        const t = clean(h.textContent);
+        if (t.length >= 2 && /[\p{L}\p{N}]/u.test(t)) category = t.slice(0, 40);
+      } else break;
     }
 
     // 標籤 + 每人限購：卡入面同所屬分類標題都掃一次
@@ -190,7 +193,17 @@ function extractInPage(debugMode) {
   const debug = debugMode ? {
     priceLeafCount: leaves.length,
     cardCount: cards.size,
-    sampleCards: Array.from(cards).slice(0, 3).map(c => c.outerHTML.slice(0, 900)),
+    sampleCards: Array.from(cardArr).slice(0, 3).map(c => c.outerHTML.slice(0, 900)),
+    // 成頁嘅連結（睇分類導覽點樣組織，搵「全部商品」嗰類入口）
+    allLinks: Array.from(document.querySelectorAll('a[href]')).slice(0, 400).map(a => ({
+      href: a.getAttribute('href'),
+      text: clean(a.textContent).slice(0, 40),
+    })),
+    // 價錢低到唔合理嘅卡，整張 HTML 拎出嚟睇下係咪認錯
+    suspiciousPriceCards: products.filter(p => p.price < 200).slice(0, 3).map(p => {
+      const c = cardArr.find(c => clean(c.textContent).includes(p.name.slice(0, 12)));
+      return { name: p.name, price: p.price, html: c ? c.outerHTML.slice(0, 900) : '' };
+    }),
   } : null;
 
   return { products, debug };
@@ -384,13 +397,19 @@ async function scrapeBrowser(url, page) {
 
   const queue   = [...urls];
   const visited = new Set();
-  let pagesDone = 0;
+  // 商品卡指向嘅網址 = 單件商品詳細頁。爬佢哋好嘥時間（每頁得幾件「相關商品」），
+  // 而且會令人以為抓齊咗。呢個判斷唔使靠網址格式，適用於任何網站。
+  const detailPages = new Set();
+  const startKeys = new Set(urls.map(normKey));
+  let pagesDone = 0, skippedDetail = 0;
 
   try {
     while (queue.length && pagesDone < MAX_PAGES) {
       const url = queue.shift();
       const key = normKey(url);
       if (visited.has(key)) continue;
+      // 開頭指定嘅網址一定要抓；其餘一旦認出係商品詳細頁就略過
+      if (detailPages.has(key) && !startKeys.has(key)) { skippedDetail++; continue; }
       visited.add(key);
       pagesDone++;
 
@@ -401,11 +420,16 @@ async function scrapeBrowser(url, page) {
         all.push(...r.products);
         if (r.debug) debugDumps.push({ url, ...r.debug });
 
+        // 商品卡指向嘅網址記低做「詳細頁」，之後唔會再爬
+        for (const p of r.products) if (p.link) detailPages.add(normKey(p.link));
+
         // --crawl：自動排隊去抓分頁同分類頁
         if (CRAWL && r.links) {
           const queued = new Set(queue.map(normKey));
-          const fresh = [...r.links.paging, ...r.links.section]
-            .filter(u => !visited.has(normKey(u)) && !queued.has(normKey(u)));
+          const fresh = [...r.links.paging, ...r.links.section].filter(u => {
+            const k = normKey(u);
+            return !visited.has(k) && !queued.has(k) && !detailPages.has(k);
+          });
           if (fresh.length) {
             queue.push(...fresh);
             console.log(`  🔗 發現 ${fresh.length} 條新子頁（分頁 ${r.links.paging.length}／分類 ${r.links.section.length}）`);
@@ -416,6 +440,9 @@ async function scrapeBrowser(url, page) {
       }
     }
 
+    if (skippedDetail) {
+      console.log(`\n  ⏭️  略過咗 ${skippedDetail} 條單件商品詳細頁（唔係商品列表，爬佢哋冇用）`);
+    }
     if (queue.length) {
       console.warn(`\n  ⚠️  仲有 ${queue.length} 條子頁未抓（已達上限 --max-pages ${MAX_PAGES}）`);
       console.warn(`      加大：--max-pages ${MAX_PAGES * 2}`);

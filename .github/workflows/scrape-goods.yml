@@ -83,6 +83,9 @@ jobs:
           mkdir -p data
           cp goods.csv        data/goods.csv
           cp goods-review.csv data/goods-review.csv 2>/dev/null || true
+          # debug 檔一齊存入 repo，Claude 可以直接 pull 落嚟睇真實頁面結構
+          cp debug-dump.json  data/debug-dump.json  2>/dev/null || true
+          cp run-log.txt      data/run-log.txt      2>/dev/null || true
 
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
