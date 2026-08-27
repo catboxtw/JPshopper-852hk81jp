@@ -12,6 +12,8 @@
  *   node tools/scrape-goods.mjs "https://chiikawapark-tokyo.jp/goods/"
  *
  * 常用選項：
+ *   --venue-only          ⭐ 剔走「🌐網購限定」商品，只留親身去到會場買得到嘅
+ *   --strict-venue        再嚴格啲：淨係要明確標住「🏬會場限定」嗰啲
  *   --out goods.csv       輸出檔名（預設 goods.csv）
  *   --rate 0.22           日幣→台幣匯率（預設 0.22）
  *   --debug               抓唔到嘢時用：印出頁面結構樣本，send 俾 Claude 睇
@@ -21,8 +23,7 @@
  * 會出兩個檔案：
  *   goods.csv         欄位＝Google Sheet 商品分頁 A~J，由 A2 貼落去即可。
  *                     重量（G欄）留空要你自己填，填完 D/E/I 嘅公式會自動計價。
- *   goods-review.csv  畀你自己睇：標籤獨立一欄，方便 filter 邊啲係
- *                     🌐網購限定（可以直接落單寄）／🏬會場限定（要親身去買）。
+ *   goods-review.csv  畀你自己睇：標籤獨立一欄，方便 filter／排序。
  *
  * ⚠️ 限定標籤係靠掃描頁面文字認出嚟（オンライン限定 / パーク限定 等）。
  *    如果個網站用圖片 icon 而唔係文字標示，就捉唔到，行 --debug 傳俾 Claude 加。
@@ -37,11 +38,14 @@ const flag = (name, def = null) => {
   const i = argv.indexOf('--' + name);
   return i >= 0 ? (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[i + 1] : true) : def;
 };
-const OUT        = flag('out', 'goods.csv');
-const TWD_RATE   = parseFloat(flag('rate', '0.22'));
-const DEBUG      = !!flag('debug', false);
-const STATIC     = !!flag('static', false);
-const MAX_SCROLL = parseInt(flag('max-scroll', '30'));
+const OUT          = flag('out', 'goods.csv');
+const TWD_RATE     = parseFloat(flag('rate', '0.22'));
+const DEBUG        = !!flag('debug', false);
+const STATIC       = !!flag('static', false);
+const MAX_SCROLL   = parseInt(flag('max-scroll', '30'));
+const STRICT_VENUE = !!flag('strict-venue', false);
+const VENUE_ONLY   = !!flag('venue-only', false) || STRICT_VENUE;
+const CHROME_PATH  = flag('chrome-path', process.env.CHROME_PATH || '');
 
 if (!urls.length) {
   console.error('❌ 請提供至少一條網址，例如：\n   node tools/scrape-goods.mjs "https://chiikawapark-tokyo.jp/goods/"');
@@ -245,7 +249,10 @@ async function scrapeBrowser(url) {
     throw new Error('搵唔到 playwright，請先行：npm install playwright && npx playwright install chromium');
   });
 
-  const browser = await chromium.launch();
+  // --chrome-path：如果 npx playwright install 裝唔到，可以指定現成嘅 Chrome/Chromium
+  const browser = await chromium.launch(
+    CHROME_PATH ? { executablePath: CHROME_PATH } : {}
+  );
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   try {
     console.log('  → 開緊頁面…');
@@ -306,14 +313,46 @@ async function scrapeBrowser(url) {
 
   // 跨頁去重
   const seen = new Set();
-  const products = all.filter(p => {
+  let products = all.filter(p => {
     const k = p.name + '|' + p.price;
     if (seen.has(k)) return false;
     seen.add(k);
     return true;
   });
 
+  // ── 只留會場買得到嘅商品 ──────────────────────────────────
+  const isOnlineOnly = p => (p.tags || []).includes('🌐網購限定');
+  const isVenue      = p => (p.tags || []).includes('🏬會場限定');
+
+  if (VENUE_ONLY) {
+    const before   = products.length;
+    const online   = products.filter(isOnlineOnly).length;
+    const venue    = products.filter(p => isVenue(p) && !isOnlineOnly(p)).length;
+    const untagged = products.filter(p => !isVenue(p) && !isOnlineOnly(p)).length;
+
+    products = STRICT_VENUE
+      ? products.filter(p => isVenue(p) && !isOnlineOnly(p))   // 淨係要明確標住會場限定
+      : products.filter(p => !isOnlineOnly(p));                // 剔走網購限定，其餘照留
+
+    console.log(`\n🏬 只保留會場買得到嘅商品${STRICT_VENUE ? '（嚴格模式）' : ''}：`);
+    console.log(`     🏬 明確標住會場限定　${venue} 件　→ 保留`);
+    console.log(`     ⬜ 冇任何限定標示　　${untagged} 件　→ ${STRICT_VENUE ? '剔走（嚴格模式）' : '保留（喺場一般買到）'}`);
+    console.log(`     🌐 網購限定　　　　　${online} 件　→ 剔走`);
+    console.log(`     ${before} 件 → 保留 ${products.length} 件`);
+    if (!STRICT_VENUE && untagged) {
+      console.log(`     💡 想淨係要明確標住「會場限定」嗰 ${venue} 件，加 --strict-venue 再行一次。`);
+    }
+  }
+
   if (!products.length) {
+    if (all.length) {
+      // 有抓到嘢，只係全部俾篩選規則剔走咗
+      console.error('\n❌ 篩選之後一件都唔剩。');
+      console.error(STRICT_VENUE
+        ? '   --strict-venue 淨係要明確標住「会場限定 / パーク限定」嘅商品，但一件都認唔到。\n   除去 --strict-venue 再行一次（改為只剔走網購限定）。'
+        : '   全部商品都被當成網購限定 —— 好可能係認錯，行 --debug 傳返俾 Claude 睇。');
+      process.exit(1);
+    }
     console.error('\n❌ 一件商品都抓唔到。');
     console.error('   請加 --debug 再行一次，然後將印出嚟嘅內容 send 俾 Claude 幫你調整。');
     if (debugDumps.length) {
