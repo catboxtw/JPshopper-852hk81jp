@@ -11,6 +11,14 @@ on:
         description: '商品頁網址（多過一條就用空格分開）'
         required: true
         default: 'https://chiikawapark-tokyo.jp/goods/'
+      crawl:
+        description: '自動跟住分頁／分類連結逐頁抓（商品分散喺多個頁面時要開）'
+        type: boolean
+        default: true
+      max_pages:
+        description: '自動抓最多幾多頁'
+        required: false
+        default: '60'
       venue_only:
         description: '只要現場買得到嘅貨（剔走「オンライン限定」）'
         type: boolean
@@ -27,14 +35,18 @@ on:
         description: '日幣→台幣匯率'
         required: false
         default: '0.22'
+      commit_to_repo:
+        description: '把 CSV 存入 repo 嘅 data/ 資料夾（唔使去 Artifacts 下載）'
+        type: boolean
+        default: true
 
 permissions:
-  contents: read
+  contents: write   # 要寫返 CSV 入 repo
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50   # --crawl 抓幾十頁要時間
 
     steps:
       - name: 攞 code
@@ -57,12 +69,33 @@ jobs:
         run: |
           ARGS=""
           if [ "${{ inputs.venue_only }}" = "true" ]; then ARGS="$ARGS --venue-only"; fi
+          if [ "${{ inputs.crawl }}" = "true" ]; then ARGS="$ARGS --crawl --max-pages ${{ inputs.max_pages }}"; fi
           if [ "${{ inputs.expect }}" != "0" ]; then ARGS="$ARGS --expect ${{ inputs.expect }}"; fi
           ARGS="$ARGS --max-scroll ${{ inputs.max_scroll }} --rate ${{ inputs.twd_rate }} --debug"
 
           echo "▶ 執行：node tools/scrape-goods.mjs ${{ inputs.url }} $ARGS"
           echo ""
           node tools/scrape-goods.mjs ${{ inputs.url }} $ARGS 2>&1 | tee run-log.txt
+
+      - name: 存入 repo 嘅 data/ 資料夾
+        if: ${{ inputs.commit_to_repo && hashFiles('goods.csv') != '' }}
+        run: |
+          mkdir -p data
+          cp goods.csv        data/goods.csv
+          cp goods-review.csv data/goods-review.csv 2>/dev/null || true
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+
+          if git diff --staged --quiet; then
+            echo "📋 內容同上次一樣，唔使 commit"
+          else
+            N=$(( $(wc -l < goods.csv) - 1 ))
+            git commit -m "抓取商品清單：${N} 件（${{ inputs.url }}）"
+            git push
+            echo "✅ 已存入 data/goods.csv（${N} 件）"
+          fi
 
       - name: 整理結果摘要
         if: always()
@@ -83,7 +116,11 @@ jobs:
             tail -40 run-log.txt 2>/dev/null || echo '(冇 log)'
             echo '```'
             echo ""
-            echo "📥 喺呢一頁最底 **Artifacts** 度下載 \`goods-csv\`。"
+            if [ "${{ inputs.commit_to_repo }}" = "true" ]; then
+              echo "📁 CSV 已存入 repo：[\`data/goods.csv\`](../../blob/main/data/goods.csv) ・ [\`data/goods-review.csv\`](../../blob/main/data/goods-review.csv)"
+              echo ""
+            fi
+            echo "📥 亦可喺呢一頁最底 **Artifacts** 下載 \`goods-csv\`（記住要喺 run 頁面，唔係 job 頁面）。"
           } >> $GITHUB_STEP_SUMMARY
 
       - name: 上傳 CSV

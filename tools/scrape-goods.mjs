@@ -12,6 +12,8 @@
  *   node tools/scrape-goods.mjs "https://chiikawapark-tokyo.jp/goods/"
  *
  * 常用選項：
+ *   --crawl               ⭐ 自動跟住分頁／分類連結去抓（商品分散喺多個頁面時必用）
+ *   --max-pages 60        --crawl 最多抓幾多頁（預設 60）
  *   --venue-only          ⭐ 剔走「🌐網購限定」商品，只留親身去到會場買得到嘅
  *   --strict-venue        再嚴格啲：淨係要明確標住「🏬會場限定」嗰啲
  *   --expect 400          ⭐ 預期最少幾多件；唔夠會出警告（防止頁面冇載入齊）
@@ -48,6 +50,8 @@ const EXPECT       = parseInt(flag('expect', '0')) || 0;
 const STRICT_VENUE = !!flag('strict-venue', false);
 const VENUE_ONLY   = !!flag('venue-only', false) || STRICT_VENUE;
 const CHROME_PATH  = flag('chrome-path', process.env.CHROME_PATH || '');
+const CRAWL        = !!flag('crawl', false);
+const MAX_PAGES    = parseInt(flag('max-pages', '60'));
 
 if (!urls.length) {
   console.error('❌ 請提供至少一條網址，例如：\n   node tools/scrape-goods.mjs "https://chiikawapark-tokyo.jp/goods/"');
@@ -255,24 +259,48 @@ async function scrapeStatic(url) {
   return extractInPage(DEBUG);
 }
 
-async function scrapeBrowser(url) {
-  const { chromium } = await import('playwright').catch(() => {
-    throw new Error('搵唔到 playwright，請先行：npm install playwright && npx playwright install chromium');
-  });
+// 喺頁面度搵出「同一區段嘅其他頁」：分頁連結 + 分類頁連結
+// 好多日本商品網唔係無限捲動，而係分咗好多分類頁／分頁，要逐頁去抓。
+function discoverLinksInPage(baseHref) {
+  const base = new URL(baseHref);
+  const basePath = base.pathname.replace(/\/+$/, '');
+  // ⚠️ 去重先剝尾斜線；真正去行嗰條網址一定要保留原樣，
+  //    因為 /a/?page=2 同 /a?page=2 喺好多伺服器係兩件事（會 404）。
+  const norm = u => u.origin + u.pathname.replace(/\/+$/, '') + u.search;
+  const here = norm(base);
 
-  // --chrome-path：如果 npx playwright install 裝唔到，可以指定現成嘅 Chrome/Chromium
-  const browser = await chromium.launch(
-    CHROME_PATH ? { executablePath: CHROME_PATH } : {}
-  );
-  // 扮返個正常日本訪客：預設 headless UA 會寫住 HeadlessChrome，有啲網站會擋
-  const page = await browser.newPage({
-    viewport:   { width: 1440, height: 900 },
-    userAgent:  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    locale:     'ja-JP',
-    timezoneId: 'Asia/Tokyo',
-    extraHTTPHeaders: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
-  });
-  try {
+  const paging = new Set();
+  const section = new Set();
+
+  for (const a of document.querySelectorAll('a[href]')) {
+    let u;
+    try { u = new URL(a.getAttribute('href'), location.href); } catch (e) { continue; }
+    if (u.origin !== base.origin) continue;
+
+    const clean = u.origin + u.pathname + u.search;   // 保留原樣去行
+    if (norm(u) === here) continue;
+
+    // 1) 分頁：?page=2 / /page/2/ / rel=next / 文字「次へ」
+    const looksPaged = /[?&](page|p|pg)=\d+/i.test(u.search) || /\/page\/\d+/i.test(u.pathname);
+    const relNext = (a.getAttribute('rel') || '').toLowerCase().includes('next');
+    const textNext = /次へ|次のページ|次ページ|›|»|→/.test((a.textContent || '').trim());
+    if (looksPaged || relNext || textNext) { paging.add(clean); continue; }
+
+    // 2) 同一區段嘅子頁（例如 /goods/ 下面嘅 /goods/plush/）
+    if (!u.pathname.startsWith(basePath + '/')) continue;
+    const tail = u.pathname.slice(basePath.length + 1).replace(/\/+$/, '');
+    if (!tail) continue;
+    // 排除明顯係「單件商品詳細頁」：純數字 / item-123 之類，抓佢哋好嘥時間
+    if (/^\d+$/.test(tail) || /^(item|detail|product)s?[-_/]?\d+/i.test(tail)) continue;
+    if (tail.split('/').length > 2) continue;   // 太深唔要
+    section.add(clean);
+  }
+
+  return { paging: Array.from(paging), section: Array.from(section) };
+}
+
+async function scrapeBrowser(url, page) {
+  {
     console.log('  → 開緊頁面…');
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
@@ -284,9 +312,13 @@ async function scrapeBrowser(url) {
     for (; i < MAX_SCROLL && stable < 3; i++) {
       const before = await page.evaluate(() => document.body.scrollHeight);
 
-      const moreBtn = page.locator(
-        'text=/もっと見る|もっとみる|さらに表示|次へ|Load more|See more/i'
-      ).first();
+      // ⚠️ 只撳「喺原地載入更多」嗰種掣（もっと見る）。
+      //    「次へ」係分頁連結，撳咗會跳去第二頁，當前頁啲貨就會流失 ——
+      //    分頁交畀 --crawl 逐頁去抓，所以呢度特登排除有真 href 嘅 <a>。
+      const moreBtn = page
+        .locator('button, [role="button"], a[href="#"], a[href^="javascript"], a:not([href])')
+        .filter({ hasText: /もっと見る|もっとみる|さらに表示|もっと読み込む|Load more|See more/i })
+        .first();
       if (await moreBtn.count() && await moreBtn.isVisible().catch(() => false)) {
         await moreBtn.click().catch(() => {});
         await page.waitForTimeout(1500);
@@ -315,9 +347,10 @@ async function scrapeBrowser(url) {
     await page.waitForTimeout(800);
 
     console.log('  → 抽取商品資料…');
-    return await page.evaluate(extractInPage, DEBUG);
-  } finally {
-    await browser.close();
+    const result = await page.evaluate(extractInPage, DEBUG);
+    // 順手記低呢一頁見到嘅分頁／分類連結，畀 --crawl 用
+    result.links = CRAWL ? await page.evaluate(discoverLinksInPage, url) : { paging: [], section: [] };
+    return result;
   }
 }
 
@@ -325,16 +358,70 @@ async function scrapeBrowser(url) {
   const all = [];
   const debugDumps = [];
 
-  for (const url of urls) {
-    console.log(`\n📦 ${url}`);
-    try {
-      const { products, debug } = STATIC ? await scrapeStatic(url) : await scrapeBrowser(url);
-      console.log(`  ✅ 抓到 ${products.length} 件商品`);
-      all.push(...products);
-      if (debug) debugDumps.push({ url, ...debug });
-    } catch (e) {
-      console.error(`  ❌ 失敗：${e.message}`);
+  // 開一次瀏覽器，全部頁面共用（快好多）
+  let browser = null, page = null;
+  if (!STATIC) {
+    const { chromium } = await import('playwright').catch(() => {
+      throw new Error('搵唔到 playwright，請先行：npm install playwright && npx playwright install chromium');
+    });
+    // --chrome-path：如果 npx playwright install 裝唔到，可以指定現成嘅 Chrome/Chromium
+    browser = await chromium.launch(CHROME_PATH ? { executablePath: CHROME_PATH } : {});
+    // 扮返個正常日本訪客：預設 headless UA 會寫住 HeadlessChrome，有啲網站會擋
+    page = await browser.newPage({
+      viewport:   { width: 1440, height: 900 },
+      userAgent:  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      locale:     'ja-JP',
+      timezoneId: 'Asia/Tokyo',
+      extraHTTPHeaders: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
+    });
+  }
+
+  // 去重用嘅正規化：剝走尾斜線做比較，但行嘅時候用原本條網址
+  const normKey = (u) => {
+    try { const x = new URL(u); return x.origin + x.pathname.replace(/\/+$/, '') + x.search; }
+    catch { return u.replace(/\/+$/, ''); }
+  };
+
+  const queue   = [...urls];
+  const visited = new Set();
+  let pagesDone = 0;
+
+  try {
+    while (queue.length && pagesDone < MAX_PAGES) {
+      const url = queue.shift();
+      const key = normKey(url);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      pagesDone++;
+
+      console.log(`\n📦 [${pagesDone}/${Math.min(MAX_PAGES, visited.size + queue.length)}] ${url}`);
+      try {
+        const r = STATIC ? await scrapeStatic(url) : await scrapeBrowser(url, page);
+        console.log(`  ✅ 抓到 ${r.products.length} 件商品`);
+        all.push(...r.products);
+        if (r.debug) debugDumps.push({ url, ...r.debug });
+
+        // --crawl：自動排隊去抓分頁同分類頁
+        if (CRAWL && r.links) {
+          const queued = new Set(queue.map(normKey));
+          const fresh = [...r.links.paging, ...r.links.section]
+            .filter(u => !visited.has(normKey(u)) && !queued.has(normKey(u)));
+          if (fresh.length) {
+            queue.push(...fresh);
+            console.log(`  🔗 發現 ${fresh.length} 條新子頁（分頁 ${r.links.paging.length}／分類 ${r.links.section.length}）`);
+          }
+        }
+      } catch (e) {
+        console.error(`  ❌ 失敗：${e.message}`);
+      }
     }
+
+    if (queue.length) {
+      console.warn(`\n  ⚠️  仲有 ${queue.length} 條子頁未抓（已達上限 --max-pages ${MAX_PAGES}）`);
+      console.warn(`      加大：--max-pages ${MAX_PAGES * 2}`);
+    }
+  } finally {
+    if (browser) await browser.close();
   }
 
   // 跨頁去重
@@ -410,10 +497,14 @@ async function scrapeBrowser(url) {
     const scraped = all.length; // 篩選之前抓到嘅總數
     if (scraped < EXPECT) {
       console.warn(`\n   ⚠️⚠️  只抓到 ${scraped} 件，少過你預期嘅 ${EXPECT} 件！`);
-      console.warn(`         個頁面好可能未載齊，唔好就咁攞去報價。試吓：`);
-      console.warn(`         1. 加大捲動次數：--max-scroll ${MAX_SCROLL * 2}`);
-      console.warn(`         2. 睇吓啲貨係咪分咗幾個分類頁，逐條網址一次過傳入：`);
-      console.warn(`            node tools/scrape-goods.mjs "網址1" "網址2" "網址3" …`);
+      console.warn(`         唔好就咁攞去報價。按呢個次序試：`);
+      if (!CRAWL) {
+        console.warn(`         1. ⭐ 加 --crawl —— 商品好大機會分咗喺多個分類頁／分頁，`);
+        console.warn(`               呢個選項會自動跟住連結逐頁抓。多數係呢個原因。`);
+      } else {
+        console.warn(`         1. 加大頁數上限：--max-pages ${MAX_PAGES * 2}`);
+      }
+      console.warn(`         2. 加大捲動次數：--max-scroll ${MAX_SCROLL * 2}`);
       console.warn(`         3. 仲係唔掂就行 --debug，傳 debug-dump.json 俾 Claude`);
     } else {
       console.log(`   ✅ 抓到 ${scraped} 件，已達到你預期嘅 ${EXPECT} 件`);
