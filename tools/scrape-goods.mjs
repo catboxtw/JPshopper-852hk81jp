@@ -14,11 +14,12 @@
  * 常用選項：
  *   --venue-only          ⭐ 剔走「🌐網購限定」商品，只留親身去到會場買得到嘅
  *   --strict-venue        再嚴格啲：淨係要明確標住「🏬會場限定」嗰啲
+ *   --expect 400          ⭐ 預期最少幾多件；唔夠會出警告（防止頁面冇載入齊）
  *   --out goods.csv       輸出檔名（預設 goods.csv）
  *   --rate 0.22           日幣→台幣匯率（預設 0.22）
  *   --debug               抓唔到嘢時用：印出頁面結構樣本，send 俾 Claude 睇
  *   --static              唔用瀏覽器，直接抓 HTML（快，但 JS 載入嘅頁面會抓唔到）
- *   --max-scroll 40       最多向下捲幾多次（處理無限捲動，預設 30）
+ *   --max-scroll 80       最多向下捲幾多次（預設 80；捲到冇新嘢會自動停）
  *
  * 會出兩個檔案：
  *   goods.csv         欄位＝Google Sheet 商品分頁 A~J，由 A2 貼落去即可。
@@ -42,7 +43,8 @@ const OUT          = flag('out', 'goods.csv');
 const TWD_RATE     = parseFloat(flag('rate', '0.22'));
 const DEBUG        = !!flag('debug', false);
 const STATIC       = !!flag('static', false);
-const MAX_SCROLL   = parseInt(flag('max-scroll', '30'));
+const MAX_SCROLL   = parseInt(flag('max-scroll', '80'));
+const EXPECT       = parseInt(flag('expect', '0')) || 0;
 const STRICT_VENUE = !!flag('strict-venue', false);
 const VENUE_ONLY   = !!flag('venue-only', false) || STRICT_VENUE;
 const CHROME_PATH  = flag('chrome-path', process.env.CHROME_PATH || '');
@@ -259,9 +261,11 @@ async function scrapeBrowser(url) {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
 
     // 捲到底 + 撳「もっと見る」之類嘅載入更多按鈕
+    // 一路捲一路報住而家有幾多件，等你睇到係咪仲載緊
     console.log('  → 捲動載入全部商品…');
-    let stable = 0;
-    for (let i = 0; i < MAX_SCROLL && stable < 3; i++) {
+    const countImgs = () => page.evaluate(() => document.querySelectorAll('img').length);
+    let stable = 0, i = 0;
+    for (; i < MAX_SCROLL && stable < 3; i++) {
       const before = await page.evaluate(() => document.body.scrollHeight);
 
       const moreBtn = page.locator(
@@ -277,6 +281,12 @@ async function scrapeBrowser(url) {
 
       const after = await page.evaluate(() => document.body.scrollHeight);
       stable = after === before ? stable + 1 : 0;
+      if (i % 5 === 4) console.log(`     …捲咗 ${i + 1} 次，頁面已有約 ${await countImgs()} 張圖`);
+    }
+    // 用盡捲動次數但頁面仲喺度長 = 好可能未載齊
+    if (i >= MAX_SCROLL && stable < 3) {
+      console.warn(`  ⚠️  捲到上限 ${MAX_SCROLL} 次頁面仍然喺度加長，可能未載齊！`);
+      console.warn(`      建議加大：--max-scroll ${MAX_SCROLL * 2}`);
     }
 
     // 觸發 lazy-load 圖片：由頭慢慢捲返落去
@@ -368,6 +378,21 @@ async function scrapeBrowser(url) {
 
   console.log(`\n🎉 完成！共 ${products.length} 件商品`);
   console.log(`   價錢範圍：¥${Math.min(...products.map(p => p.price)).toLocaleString()} ~ ¥${Math.max(...products.map(p => p.price)).toLocaleString()}`);
+
+  // 件數對唔對得上你嘅預期？唔夠嘅話大聲提你，唔好靜靜哋少咗貨
+  if (EXPECT) {
+    const scraped = all.length; // 篩選之前抓到嘅總數
+    if (scraped < EXPECT) {
+      console.warn(`\n   ⚠️⚠️  只抓到 ${scraped} 件，少過你預期嘅 ${EXPECT} 件！`);
+      console.warn(`         個頁面好可能未載齊，唔好就咁攞去報價。試吓：`);
+      console.warn(`         1. 加大捲動次數：--max-scroll ${MAX_SCROLL * 2}`);
+      console.warn(`         2. 睇吓啲貨係咪分咗幾個分類頁，逐條網址一次過傳入：`);
+      console.warn(`            node tools/scrape-goods.mjs "網址1" "網址2" "網址3" …`);
+      console.warn(`         3. 仲係唔掂就行 --debug，傳 debug-dump.json 俾 Claude`);
+    } else {
+      console.log(`   ✅ 抓到 ${scraped} 件，已達到你預期嘅 ${EXPECT} 件`);
+    }
+  }
 
   // 標籤統計：一眼睇清有幾多件係網購限定 / 會場限定
   const tally = {};
