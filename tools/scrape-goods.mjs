@@ -18,9 +18,14 @@
  *   --static              唔用瀏覽器，直接抓 HTML（快，但 JS 載入嘅頁面會抓唔到）
  *   --max-scroll 40       最多向下捲幾多次（處理無限捲動，預設 30）
  *
- * 輸出 CSV 欄位順序 = Google Sheet 商品分頁欄位順序（A~J），
- * 開啟後由 A2 開始貼上即可。重量（G欄）留空，要你自己填，
- * 填完 D/E/I 欄嘅公式會自動計出成本同售價。
+ * 會出兩個檔案：
+ *   goods.csv         欄位＝Google Sheet 商品分頁 A~J，由 A2 貼落去即可。
+ *                     重量（G欄）留空要你自己填，填完 D/E/I 嘅公式會自動計價。
+ *   goods-review.csv  畀你自己睇：標籤獨立一欄，方便 filter 邊啲係
+ *                     🌐網購限定（可以直接落單寄）／🏬會場限定（要親身去買）。
+ *
+ * ⚠️ 限定標籤係靠掃描頁面文字認出嚟（オンライン限定 / パーク限定 等）。
+ *    如果個網站用圖片 icon 而唔係文字標示，就捉唔到，行 --debug 傳俾 Claude 加。
  */
 
 import { writeFileSync } from 'node:fs';
@@ -49,6 +54,21 @@ if (!urls.length) {
 // 抽商品名 / 圖片 / 連結。咁樣唔使預先知道個網站嘅 class 名。
 function extractInPage(debugMode) {
   const PRICE_RE = /(?:[¥￥]\s*([0-9][0-9,]*)|([0-9][0-9,]*)\s*円)/;
+
+  // 商品標籤：最緊要係分清「網購限定」定「會場限定」
+  // （會場限定＝要有人親身去買；網購限定＝可以直接落單寄出）
+  const TAG_PATTERNS = [
+    { re: /オンライン(ストア|ショップ)?限定|ONLINE\s?限定|WEB\s?限定|ウェブ限定|通販限定/i, tag: '🌐網購限定' },
+    { re: /パーク限定|会場限定|店舗限定|館内限定|ここでしか|現地限定/,                      tag: '🏬會場限定' },
+    { re: /予約(商品|受付|販売)|受注生産|お取り寄せ/,                                      tag: '預訂商品' },
+    { re: /SOLD\s?OUT|完売|品切れ|在庫(なし|切れ)/i,                                       tag: '⛔售罄' },
+    { re: /数量限定/,                                                                      tag: '數量限定' },
+    { re: /期間限定/,                                                                      tag: '期間限定' },
+    { re: /新商品|NEW\s?(ITEM|ARRIVAL)|新発売/i,                                           tag: '新商品' },
+  ];
+  // 每人限購：「お一人様◯点まで」→ 直接填入試算表 J 欄
+  const LIMIT_RE = /お一人様[^0-9０-９]{0,6}([0-9０-９]+)\s*(?:点|個|コ|つ)/;
+  const toHalfWidth = s => (s || '').replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
 
   const parsePrice = (txt) => {
     const m = (txt || '').match(PRICE_RE);
@@ -130,7 +150,13 @@ function extractInPage(debugMode) {
       else break;
     }
 
-    out.push({ name, price, imgUrl, link, category });
+    // 標籤 + 每人限購：卡入面同所屬分類標題都掃一次
+    const scanText = clean(card.textContent) + ' ' + category;
+    const tags = TAG_PATTERNS.filter(t => t.re.test(scanText)).map(t => t.tag);
+    const lm = scanText.match(LIMIT_RE);
+    const limitPerPerson = lm ? parseInt(toHalfWidth(lm[1]), 10) || '' : '';
+
+    out.push({ name, price, imgUrl, link, category, tags, limitPerPerson });
   }
 
   // 4) 去重（同名同價當作同一件）
@@ -174,13 +200,27 @@ function toCsv(products, rate) {
       `=CEILING(D${r}+30,1)`,               // E 售價HKD = 成本+30
       p.imgUrl,                             // F 圖片
       '',                                   // G 重量g：⚠️ 要你自己填
-      p.category ? '分類：' + p.category : '', // H 備註
+      [p.category ? '分類：' + p.category : '', ...(p.tags || [])]
+        .filter(Boolean).join(' ／ '),      // H 備註（含分類＋限定標籤）
       `=CEILING(C${r}*${rate},5)`,          // I 台幣售價（進位至5的倍數）
-      '',                                   // J 限購：留空 = 不限
+      p.limitPerPerson || '',               // J 限購（お一人様◯点まで）
     ].map(csvCell).join(','));
   });
 
   return '﻿' + lines.join('\r\n'); // BOM：確保 Excel 開日文唔會亂碼
+}
+
+// 第二個檔案：畀你自己篩選／排序用（標籤獨立一欄，方便 filter 網購限定）
+function toReviewCsv(products) {
+  const header = ['商品名稱', '日幣原價', '標籤', '分類', '每人限購', '商品連結', '圖片'];
+  const lines = [header.map(csvCell).join(',')];
+  products.forEach(p => {
+    lines.push([
+      p.name, p.price, (p.tags || []).join(' ／ '),
+      p.category || '', p.limitPerPerson || '', p.link || '', p.imgUrl || '',
+    ].map(csvCell).join(','));
+  });
+  return '﻿' + lines.join('\r\n');
 }
 
 // ── 主流程 ────────────────────────────────────────────────
@@ -283,11 +323,33 @@ async function scrapeBrowser(url) {
     process.exit(1);
   }
 
+  const REVIEW_OUT = OUT.replace(/\.csv$/i, '') + '-review.csv';
   writeFileSync(OUT, toCsv(products, TWD_RATE), 'utf8');
-  console.log(`\n🎉 完成！共 ${products.length} 件商品 → ${OUT}`);
+  writeFileSync(REVIEW_OUT, toReviewCsv(products), 'utf8');
+
+  console.log(`\n🎉 完成！共 ${products.length} 件商品`);
   console.log(`   價錢範圍：¥${Math.min(...products.map(p => p.price)).toLocaleString()} ~ ¥${Math.max(...products.map(p => p.price)).toLocaleString()}`);
-  console.log(`\n   下一步：用 Excel／Google Sheet 開 ${OUT}，`);
-  console.log(`   填好「重量g」欄之後，成本／港幣售價／台幣售價會自動計出嚟。`);
+
+  // 標籤統計：一眼睇清有幾多件係網購限定 / 會場限定
+  const tally = {};
+  products.forEach(p => (p.tags || []).forEach(t => { tally[t] = (tally[t] || 0) + 1; }));
+  const tagged = Object.entries(tally).sort((a, b) => b[1] - a[1]);
+  if (tagged.length) {
+    console.log(`\n   🏷️  標籤統計：`);
+    tagged.forEach(([t, n]) => console.log(`        ${t}　${n} 件`));
+  } else {
+    console.log(`\n   ⚠️  一個限定標籤都捉唔到 —— 可能個網站唔係用文字標示（例如用圖片 icon），`);
+    console.log(`        或者用咗其他字眼。行 --debug 傳返 debug-dump.json 俾 Claude 幫你加。`);
+  }
+  const noLimitInfo = products.filter(p => !(p.tags || []).some(t => /限定/.test(t))).length;
+  if (tagged.length && noLimitInfo) {
+    console.log(`        （另有 ${noLimitInfo} 件冇任何限定標示，落單前建議自己 double check）`);
+  }
+
+  console.log(`\n   📄 ${OUT}`);
+  console.log(`      欄位＝Google Sheet A~J，由 A2 貼落去；填好「重量g」欄後成本／售價自動計。`);
+  console.log(`   📄 ${REVIEW_OUT}`);
+  console.log(`      標籤獨立一欄，用嚟 filter「🌐網購限定」／「🏬會場限定」睇邊啲買到。`);
 
   if (debugDumps.length) {
     writeFileSync('debug-dump.json', JSON.stringify(debugDumps, null, 2), 'utf8');
