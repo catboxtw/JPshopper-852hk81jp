@@ -222,7 +222,7 @@ function toCsv(products, rate) {
     ].map(csvCell).join(','));
   });
 
-  return '﻿' + lines.join('\r\n'); // BOM：確保 Excel 開日文唔會亂碼
+  return '﻿' + lines.join('\r\n') + '\r\n'; // BOM：確保 Excel 開日文唔會亂碼；結尾換行方便 wc -l 點算
 }
 
 // 第二個檔案：畀你自己篩選／排序用（標籤獨立一欄，方便 filter 網購限定）
@@ -235,7 +235,7 @@ function toReviewCsv(products) {
       p.category || '', p.limitPerPerson || '', p.link || '', p.imgUrl || '',
     ].map(csvCell).join(','));
   });
-  return '﻿' + lines.join('\r\n');
+  return '﻿' + lines.join('\r\n') + '\r\n';
 }
 
 // ── 主流程 ────────────────────────────────────────────────
@@ -264,7 +264,14 @@ async function scrapeBrowser(url) {
   const browser = await chromium.launch(
     CHROME_PATH ? { executablePath: CHROME_PATH } : {}
   );
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  // 扮返個正常日本訪客：預設 headless UA 會寫住 HeadlessChrome，有啲網站會擋
+  const page = await browser.newPage({
+    viewport:   { width: 1440, height: 900 },
+    userAgent:  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    locale:     'ja-JP',
+    timezoneId: 'Asia/Tokyo',
+    extraHTTPHeaders: { 'Accept-Language': 'ja-JP,ja;q=0.9' },
+  });
   try {
     console.log('  → 開緊頁面…');
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
@@ -346,7 +353,7 @@ async function scrapeBrowser(url) {
   const isVenue      = p => (p.tags || []).includes('🏬會場限定');
   const alsoOnline   = p => (p.tags || []).includes('🛒網上都有');
 
-  if (VENUE_ONLY) {
+  if (VENUE_ONLY && products.length) {
     const before   = products.length;
     const online   = products.filter(isOnlineOnly).length;
     const venue    = products.filter(p => isVenue(p) && !isOnlineOnly(p)).length;

@@ -1,0 +1,100 @@
+name: 🛍️ 抓取日本商品清單
+
+# 喺 GitHub 個伺服器度跑抓取工具，唔使自己部電腦裝任何嘢。
+# 用法：Actions 分頁 → 揀「🛍️ 抓取日本商品清單」→ 撳 Run workflow
+#       行完喺同一頁最底下載 goods-csv 個 zip。
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: '商品頁網址（多過一條就用空格分開）'
+        required: true
+        default: 'https://chiikawapark-tokyo.jp/goods/'
+      venue_only:
+        description: '只要現場買得到嘅貨（剔走「オンライン限定」）'
+        type: boolean
+        default: true
+      expect:
+        description: '預期最少幾多件（抓唔夠會出警告，填 0 = 唔檢查）'
+        required: false
+        default: '400'
+      max_scroll:
+        description: '最多向下捲幾多次（貨多就調大啲）'
+        required: false
+        default: '80'
+      twd_rate:
+        description: '日幣→台幣匯率'
+        required: false
+        default: '0.22'
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 攞 code
+        uses: actions/checkout@v4
+
+      - name: 裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 裝 Playwright 同瀏覽器
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: 開始抓取
+        id: scrape
+        continue-on-error: true          # 就算失敗都要上傳 debug 檔
+        run: |
+          ARGS=""
+          if [ "${{ inputs.venue_only }}" = "true" ]; then ARGS="$ARGS --venue-only"; fi
+          if [ "${{ inputs.expect }}" != "0" ]; then ARGS="$ARGS --expect ${{ inputs.expect }}"; fi
+          ARGS="$ARGS --max-scroll ${{ inputs.max_scroll }} --rate ${{ inputs.twd_rate }} --debug"
+
+          echo "▶ 執行：node tools/scrape-goods.mjs ${{ inputs.url }} $ARGS"
+          echo ""
+          node tools/scrape-goods.mjs ${{ inputs.url }} $ARGS 2>&1 | tee run-log.txt
+
+      - name: 整理結果摘要
+        if: always()
+        run: |
+          {
+            echo "## 🛍️ 抓取結果"
+            echo ""
+            if [ -f goods.csv ]; then
+              # 減一係因為第一行係標題
+              N=$(( $(wc -l < goods.csv) - 1 ))
+              echo "✅ **抓到 $N 件商品**（已寫入 \`goods.csv\`）"
+            else
+              echo "❌ **冇出到 CSV** —— 睇下面 log 同下載 debug-dump.json"
+            fi
+            echo ""
+            echo "### 執行記錄"
+            echo '```'
+            tail -40 run-log.txt 2>/dev/null || echo '(冇 log)'
+            echo '```'
+            echo ""
+            echo "📥 喺呢一頁最底 **Artifacts** 度下載 \`goods-csv\`。"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: 上傳 CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: goods-csv
+          path: |
+            goods.csv
+            goods-review.csv
+            debug-dump.json
+            run-log.txt
+          if-no-files-found: warn
+          retention-days: 30
