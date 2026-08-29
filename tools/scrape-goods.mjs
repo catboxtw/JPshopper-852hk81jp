@@ -108,7 +108,13 @@ function extractNextJsGoods() {
   };
 
   const origin = location.origin;
-  const abs = u => (!u ? '' : (/^https?:/i.test(u) ? u : origin + (u.startsWith('/') ? '' : '/') + u));
+  // 圖片檔名有空格／日文／括號（例：「Gxzg_9RbsAMS591 (1).jpeg」「ふわふわ….jpg」），
+  // 唔編碼就咁放入 <img src> 會載唔到，所以一律轉成合法網址。
+  const abs = (u) => {
+    if (!u) return '';
+    const full = /^https?:/i.test(u) ? u : origin + (u.startsWith('/') ? '' : '/') + u;
+    try { return encodeURI(decodeURI(full)); } catch (e) { return encodeURI(full); }
+  };
 
   const out = [];
   for (const it of items) {
@@ -128,6 +134,8 @@ function extractNextJsGoods() {
     out.push({
       name, price,
       imgUrl:   abs(it.images && it.images[0] && it.images[0].url),
+      // 其餘圖片（款式／細節相）放埋入 review CSV，揀圖時唔使再開網站
+      allImages: (it.images || []).map(im => abs(im && im.url)).filter(Boolean),
       link:     origin + '/goods/' + (it.id || '') + '/',
       category: it.category || '',
       tags,
@@ -347,12 +355,15 @@ function toCsv(products, rate) {
 
 // 第二個檔案：畀你自己篩選／排序用（標籤獨立一欄，方便 filter 網購限定）
 function toReviewCsv(products) {
-  const header = ['商品名稱', '日幣原價', '價錢原文', '標籤', '分類', '每人限購', '商品連結', '官方網購連結', '圖片'];
+  const header = ['商品名稱', '日幣原價', '價錢原文', '標籤', '分類', '每人限購',
+                  '商品連結', '官方網購連結', '主圖', '圖片數', '全部圖片'];
   const lines = [header.map(csvCell).join(',')];
   products.forEach(p => {
+    const imgs = p.allImages && p.allImages.length ? p.allImages : (p.imgUrl ? [p.imgUrl] : []);
     lines.push([
       p.name, p.price, p.priceRaw || '', (p.tags || []).join(' ／ '),
-      p.category || '', p.limitPerPerson || '', p.link || '', p.onlineUrl || '', p.imgUrl || '',
+      p.category || '', p.limitPerPerson || '', p.link || '', p.onlineUrl || '',
+      p.imgUrl || '', imgs.length || '', imgs.join(' '),
     ].map(csvCell).join(','));
   });
   return '﻿' + lines.join('\r\n') + '\r\n';
