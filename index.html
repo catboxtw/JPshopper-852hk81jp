@@ -336,8 +336,8 @@
         <li>✨ 國際運費只收實重，無體積重</li>
       </ul>
       <div class="service-rate">
-        <strong>匯率：</strong>¥1 = HK$0.059（稅込価格換算）<br>
-        <strong>到港運費：</strong>HK$4.5／50g，另加 $10-$13 本地運費
+        <strong>匯率：</strong>¥1 = HK$<span data-rate-hk>0.057</span>（稅込価格換算）<br>
+        <strong>到港運費：</strong>HK$<span data-ship-hk>4.5</span>／50g，另加 $10-$13 本地運費
       </div>
       <div style="margin-top:14px;">
         <div id="nissenMarqueeWrapHK" style="display:none;"></div>
@@ -380,8 +380,8 @@
         <li>✓ 國際運費只收實重，無體積重</li>
       </ul>
       <div class="service-rate">
-        <strong>匯率：</strong>¥1 = NT$0.24（稅込価格換算）<br>
-        <strong>到台運費：</strong>NT$20／50g，另加 NT$38 賣貨便國內運費
+        <strong>匯率：</strong>¥1 = NT$<span data-rate-tw>0.24</span>（稅込価格換算）<br>
+        <strong>到台運費：</strong>NT$<span data-ship-tw>20</span>／50g，另加 NT$38 賣貨便國內運費
       </div>
       <div style="margin-top:14px;">
         <div id="nissenMarqueeWrapTW" style="display:none;"></div>
@@ -410,6 +410,52 @@
             <button class="cart-submit-btn" id="nissenSubmitTW" onclick="submitNissenOrder('tw')">📦 送出訂單 →</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HK: ZOZOTOWN -->
+  <div class="service-card general hk-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✨ ZOZOTOWN 日本長期代購</li>
+        <li>✨ 服飾、生活雜貨均可代購</li>
+        <li>✨ 商品每兩星期由日本寄出，到港後用 順豐到付 / 郵局易寄取 +$10至$13 / 平郵實報實銷 寄出</li>
+        <li>✨ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率：</strong>¥1 = HK$<span data-rate-hk>0.057</span>（稅込価格換算）<br>
+        <strong>到港運費：</strong>HK$<span data-ship-hk>4.5</span>／50g，另加 $10-$13 本地運費
+      </div>
+      <div style="margin-top:14px;">
+        <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
+        <div id="zozoSlotsHK"></div>
+        <button onclick="addNissenSlot('hk','zozo')"
+          style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;">※ 加入購物車後，同 Nissen 商品一齊喺上面「🛒 購物車」送出訂單。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TW: ZOZOTOWN -->
+  <div class="service-card general tw-only">
+    <div class="service-card-inner">
+      <ul class="service-points">
+        <li>✓ ZOZOTOWN 日本長期代購</li>
+        <li>✓ 服飾、生活雜貨均可代購</li>
+        <li>✓ 商品每月從日本寄出，到台後以賣貨便收取國際運費，加國內運費 NT$38 寄出</li>
+        <li>✓ 國際運費只收實重，無體積重</li>
+      </ul>
+      <div class="service-rate">
+        <strong>匯率：</strong>¥1 = NT$<span data-rate-tw>0.24</span>（稅込価格換算）<br>
+        <strong>到台運費：</strong>NT$<span data-ship-tw>20</span>／50g，另加 NT$38 賣貨便國內運費
+      </div>
+      <div style="margin-top:14px;">
+        <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
+        <div id="zozoSlotsTW"></div>
+        <button onclick="addNissenSlot('tw','zozo')"
+          style="margin-top:6px;padding:7px 12px;background:none;border:1px dashed var(--border);border-radius:6px;font-size:12px;cursor:pointer;color:var(--muted);width:100%;">＋ 新增商品</button>
+        <p style="font-size:10px;color:var(--muted);margin-top:8px;">※ 加入購物車後，同 Nissen 商品一齊喺上面「🛒 購物車」送出訂單。</p>
       </div>
     </div>
   </div>
@@ -647,9 +693,45 @@ async function loadData() {
   setInterval(renderCards, 60000);
 }
 
-// ── Nissen 即時報價 ──
-function addNissenSlot(region) {
-  const container = document.getElementById('nissenSlots' + region.toUpperCase());
+// ── 匯率設定（admin 可改，Nissen 同 ZOZOTOWN 共用）──
+// 讀唔到 Supabase 就用返呢組預設值，報價工具照樣行得。
+const RATES = { hk: 0.057, tw: 0.24, shipHk: 4.5, shipTw: 20 };
+
+async function loadRates() {
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/app_settings?select=key,value`, { headers: SUPA_HEADERS });
+    if (!r.ok) return;
+    const rows = await r.json();
+    const map = {};
+    (rows || []).forEach(x => { map[x.key] = parseFloat(x.value); });
+    if (map.rate_hk     > 0) RATES.hk     = map.rate_hk;
+    if (map.rate_tw     > 0) RATES.tw     = map.rate_tw;
+    if (map.ship_hk_50g > 0) RATES.shipHk = map.ship_hk_50g;
+    if (map.ship_tw_50g > 0) RATES.shipTw = map.ship_tw_50g;
+  } catch(e) { /* 靜默失敗，用預設值 */ }
+  renderRateText();
+}
+
+// 把匯率寫返落各張卡嘅說明文字，唔使兩邊各自維護
+function renderRateText() {
+  document.querySelectorAll('[data-rate-hk]').forEach(el => { el.textContent = RATES.hk; });
+  document.querySelectorAll('[data-rate-tw]').forEach(el => { el.textContent = RATES.tw; });
+  document.querySelectorAll('[data-ship-hk]').forEach(el => { el.textContent = RATES.shipHk; });
+  document.querySelectorAll('[data-ship-tw]').forEach(el => { el.textContent = RATES.shipTw; });
+}
+
+// ── 代購來源設定：Nissen 同 ZOZOTOWN 共用同一套報價 UI ──
+const SHOP_SRC = {
+  nissen: { label: 'Nissen',    action: 'getNissenProduct', origin: 'nissen.co.jp' },
+  zozo:   { label: 'ZOZOTOWN',  action: 'getZozoProduct',   origin: 'zozo.jp' },
+};
+
+// ── 即時報價 ──
+function addNissenSlot(region, src) {
+  src = src || 'nissen';
+  const cfg = SHOP_SRC[src];
+  const prefix = src === 'zozo' ? 'zozoSlots' : 'nissenSlots';
+  const container = document.getElementById(prefix + region.toUpperCase());
   const idx = container.querySelectorAll('.nissen-slot').length;
   const div = document.createElement('div');
   div.className = 'nissen-slot';
@@ -657,7 +739,7 @@ function addNissenSlot(region) {
   div.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
       ${idx > 0 ? `<span style="font-size:11px;color:var(--muted);flex-shrink:0;">商品${idx+1}</span>` : ''}
-      <input type="url" class="nissen-url" placeholder="貼上 Nissen 商品網址..."
+      <input type="url" class="nissen-url" placeholder="貼上 ${cfg.label} 商品網址..."
         style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);min-width:0;color:var(--ink);">
       <button class="nissen-query-btn"
         style="padding:8px 14px;background:var(--general);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;font-weight:500;">查詢</button>
@@ -668,28 +750,30 @@ function addNissenSlot(region) {
   const input = div.querySelector('.nissen-url');
   const qBtn  = div.querySelector('.nissen-query-btn');
   const rBtn  = div.querySelector('.nissen-remove-btn');
-  qBtn.addEventListener('click', () => fetchNissenSlot(div, region));
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') fetchNissenSlot(div, region); });
+  qBtn.addEventListener('click', () => fetchNissenSlot(div, region, src));
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') fetchNissenSlot(div, region, src); });
   if (rBtn) rBtn.addEventListener('click', () => div.remove());
   container.appendChild(div);
 }
 
-async function fetchNissenSlot(slotEl, region) {
+async function fetchNissenSlot(slotEl, region, src) {
+  src = src || 'nissen';
+  const cfg = SHOP_SRC[src];
   const inputEl  = slotEl.querySelector('.nissen-url');
   const resultEl = slotEl.querySelector('.nissen-result');
   const btnEl    = slotEl.querySelector('.nissen-query-btn');
   const url = inputEl.value.trim();
-  if (!url) { resultEl.innerHTML = '<p style="font-size:12px;color:#c62828;">請先貼上 Nissen 商品網址</p>'; return; }
+  if (!url) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">請先貼上 ${cfg.label} 商品網址</p>`; return; }
 
   btnEl.disabled = true;
   resultEl.innerHTML = '<p style="font-size:12px;color:#888;">⏳ 查詢中，請稍候...</p>';
 
   try {
-    const resp = await fetch(GAS_API_URL + '?action=getNissenProduct&url=' + encodeURIComponent(url));
+    const resp = await fetch(GAS_API_URL + '?action=' + cfg.action + '&url=' + encodeURIComponent(url));
     const data = await resp.json();
     if (data.error) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`; return; }
 
-    const rate       = region === 'hk' ? 0.059 : 0.24;
+    const rate       = region === 'hk' ? RATES.hk : RATES.tw;
     const currency   = region === 'hk' ? 'HK$' : 'NT$';
     const localLabel = region === 'hk' ? '港幣' : '台幣';
     const defJpy     = data.price ? (data.priceMax ? `¥${data.price.toLocaleString()}〜¥${data.priceMax.toLocaleString()}` : `¥${data.price.toLocaleString()}`) : null;
@@ -699,7 +783,14 @@ async function fetchNissenSlot(slotEl, region) {
     if (data.image || data.name) {
       html += '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;">';
       if (data.image) html += `<img src="${data.image}" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--border);" onerror="this.style.display='none'">`;
-      if (data.name) html += `<p style="font-weight:600;color:var(--ink);font-size:13px;line-height:1.5;margin:0;padding-top:2px;">${data.name}</p>`;
+      if (data.name) {
+        html += '<div style="padding-top:2px;">';
+        // ZOZOTOWN 有品牌／店舖資料，顯示返方便你落單
+        if (data.brand || data.shop) {
+          html += `<p style="font-size:10px;color:var(--muted);margin:0 0 2px;">${[data.brand, data.shop].filter(Boolean).join('　·　')}</p>`;
+        }
+        html += `<p style="font-weight:600;color:var(--ink);font-size:13px;line-height:1.5;margin:0;">${data.name}</p></div>`;
+      }
       html += '</div>';
     }
 
@@ -707,6 +798,12 @@ async function fetchNissenSlot(slotEl, region) {
       html += '<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap;">';
       html += `<span style="font-size:13px;"><span style="font-size:10px;color:var(--muted);">日幣　</span><strong class="nissen-jpy">${defJpy}</strong></span>`;
       if (defLocal) html += `<span style="font-size:14px;color:var(--general);"><span style="font-size:10px;color:var(--muted);">${region === 'hk' ? '港幣　' : '台幣　'}</span><strong class="nissen-local">${defLocal}</strong></span>`;
+      // ZOZOTOWN 特價時顯示原價同折扣
+      if (data.origPrice && data.origPrice > data.price) {
+        html += `<span style="font-size:11px;color:var(--muted);"><s>¥${data.origPrice.toLocaleString()}</s>`;
+        if (data.discountRate) html += ` <span style="color:#c62828;font-weight:700;">${data.discountRate}%OFF</span>`;
+        html += '</span>';
+      }
       html += '</div>';
     } else {
       html += '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">（未能取得價格）</p>';
@@ -752,10 +849,10 @@ async function fetchNissenSlot(slotEl, region) {
       }
       html += '<p style="font-size:10px;color:#999;margin-top:2px;margin-bottom:8px;">※ 下單時庫存狀況可能有所變動。</p>';
     } else {
-      html += '<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 Nissen 網頁確認）</p>';
+      html += `<p style="font-size:11px;color:var(--muted);">（未能取得款式/尺寸庫存資料，建議直接到 ${cfg.label} 網頁確認）</p>`;
     }
 
-    html += '<p style="font-size:10px;color:#bbb;margin-top:8px;">資料來源：nissen.co.jp｜僅供參考，以 Nissen 網站實際顯示為準｜翻譯可能有誤</p>';
+    html += `<p style="font-size:10px;color:#bbb;margin-top:8px;">資料來源：${cfg.origin}｜僅供參考，以 ${cfg.label} 網站實際顯示為準｜翻譯可能有誤</p>`;
     html += '</div>';
     resultEl.innerHTML = html;
 
@@ -788,7 +885,8 @@ async function fetchNissenSlot(slotEl, region) {
     addBtn.addEventListener('click', () => {
       const d = slotEl._nissen;
       addToCart(region, {
-        type: 'nissen',
+        type: src,
+        source: cfg.label,
         url: d.url,
         name: d.name,
         image_url: d.image,
@@ -1097,8 +1195,11 @@ async function loadNissenFeatured() {
 }
 
 loadData();
+loadRates();                      // 匯率（Nissen 同 ZOZOTOWN 共用）
 addNissenSlot('hk');
 addNissenSlot('tw');
+addNissenSlot('hk', 'zozo');
+addNissenSlot('tw', 'zozo');
 loadNissenFeatured();
 loadNissenRecommended();
 loadCart('hk');

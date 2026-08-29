@@ -347,6 +347,12 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "getZozoProduct") {
+    var zozoResult = fetchZozoProduct_(param.url || '');
+    return ContentService.createTextOutput(JSON.stringify(zozoResult))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === "getNissenFeatured") {
     // 1. 讀取每日快取（最快，不佔 quota）
     var campItems = getNissenCampaignCached_();
@@ -668,6 +674,105 @@ function fetchNissenProduct_(url) {
     }
 
     // 翻譯日文→繁中（只翻譯含日文字符的文字）
+    if (result.name) result.name = nissenTranslate_(result.name);
+    result.variants.forEach(function(v) {
+      v.group = nissenTranslate_(v.group);
+      v.options.forEach(function(o) { if (o.name) o.name = nissenTranslate_(o.name); });
+    });
+
+    return result;
+  } catch(e) {
+    return { error: '抓取失敗：' + e.toString() };
+  }
+}
+
+// =================================================================
+// ZOZOTOWN 商品抓取
+// ZOZOTOWN 係 Next.js，成個商品資料都喺 <script id="__NEXT_DATA__"> 入面，
+// 唔使拆 HTML，直接讀 JSON 就攞到名／稅込價／圖／顏色尺碼／庫存。
+// =================================================================
+function fetchZozoProduct_(url) {
+  if (!url || url.indexOf('zozo.jp') === -1) {
+    return { error: '請輸入有效的 ZOZOTOWN 商品網址 (zozo.jp)' };
+  }
+  try {
+    var resp = UrlFetchApp.fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.5'
+      },
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (resp.getResponseCode() !== 200) {
+      return { error: '無法讀取商品頁面 (HTTP ' + resp.getResponseCode() + ')。請確認網址是否正確。' };
+    }
+    var html = resp.getContentText('UTF-8');
+    var result = { name: '', image: null, price: null, priceMax: null, variants: [], rawUrl: url };
+
+    // ── 主要路徑：__NEXT_DATA__ ──
+    var m = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (m) {
+      try {
+        var d = JSON.parse(m[1]);
+        var fsr = d && d.props && d.props.pageProps && d.props.pageProps.frontServerResult;
+        if (fsr && fsr.goods) {
+          var g = fsr.goods;
+          result.name  = (g.goodsName || '').trim();
+          result.image = g.defaultImageUrl || null;
+
+          var pi = g.priceInfo || {};
+          if (pi.price) result.price = parseInt(pi.price);          // 稅込售價
+          if (pi.doublePriceLabel && pi.doublePriceLabel.price) {
+            result.origPrice = parseInt(pi.doublePriceLabel.price); // 原價
+          }
+          if (pi.discountRate) result.discountRate = pi.discountRate;
+
+          // 品牌／店舖，方便你落單時知去邊間鋪
+          if (fsr.brand) result.brand = fsr.brand.brandName || '';
+          if (fsr.shop)  result.shop  = fsr.shop.shopNameEn || '';
+
+          // 顏色 → 尺碼，並標明有冇貨
+          var shelves = (fsr.goodsShelfInfo && fsr.goodsShelfInfo.shelves) || [];
+          var colorMap = {}, colorOrder = [];
+          shelves.forEach(function(s) {
+            var c = (s.colorName || '').trim();
+            var z = (s.sizeShortName || s.sizeName || '').trim();
+            if (!c && !z) return;
+            if (!colorMap[c]) { colorMap[c] = []; colorOrder.push(c); }
+            colorMap[c].push({
+              name: z,
+              inStock: s.captionType === 'INSTOCK',
+              reserve: false,
+              price: null
+            });
+          });
+          colorOrder.forEach(function(c) {
+            result.variants.push({ group: c || '款式', options: colorMap[c] });
+          });
+        }
+      } catch(pe) { /* 解析唔到就落去 fallback */ }
+    }
+
+    // ── 後備路徑：og / JSON-LD（萬一 ZOZO 改咗結構或者擋咗）──
+    if (!result.name) {
+      var og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+      if (og) result.name = og[1].replace(/｜.*$/, '').replace(/^【セール】/, '').trim();
+    }
+    if (!result.image) {
+      var oi = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+      if (oi) result.image = oi[1];
+    }
+    if (!result.price) {
+      var ld = html.match(/"price"\s*:\s*"?(\d+)"?/);
+      if (ld) result.price = parseInt(ld[1]);
+    }
+    if (!result.name && !result.price) {
+      return { error: 'ZOZOTOWN 讀唔到商品資料，可能係網址唔啱或者網站暫時擋咗。請稍後再試。' };
+    }
+
+    // 翻譯日文→繁中
     if (result.name) result.name = nissenTranslate_(result.name);
     result.variants.forEach(function(v) {
       v.group = nissenTranslate_(v.group);
