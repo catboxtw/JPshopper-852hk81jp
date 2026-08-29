@@ -98,12 +98,25 @@ jobs:
 
           if git diff --staged --quiet; then
             echo "📋 內容同上次一樣，唔使 commit"
-          else
-            N=$(( $(wc -l < goods.csv) - 1 ))
-            git commit -m "抓取商品清單：${N} 件（${{ inputs.url }}）"
-            git push
-            echo "✅ 已存入 data/goods.csv（${N} 件）"
+            exit 0
           fi
+
+          N=$(( $(wc -l < goods.csv) - 1 ))
+          git commit -m "抓取商品清單：${N} 件（${{ inputs.url }}）"
+
+          # 抓取要行一段時間，期間 main 可能有新 commit，
+          # 所以推之前先 rebase 上去；撞到就重試。
+          for i in 1 2 3 4 5; do
+            if git push; then
+              echo "✅ 已存入 data/goods.csv（${N} 件）"
+              exit 0
+            fi
+            echo "⚠️  遠端有新 commit，rebase 之後重試（第 $i 次）…"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || exit 1
+            sleep $(( i * 3 ))
+          done
+          echo "❌ 重試 5 次都推唔到。CSV 仍然可以喺呢一頁最底 Artifacts 下載。"
+          exit 1
 
       - name: 整理結果摘要
         if: always()

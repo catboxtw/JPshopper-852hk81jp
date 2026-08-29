@@ -543,14 +543,18 @@ async function scrapeBrowser(url, page) {
         all.push(...r.products);
         if (r.debug) debugDumps.push({ url, ...r.debug });
 
-        // 由嵌入資料一次過攞齊咗，就唔使再爬任何子頁
-        if (r.fromEmbedded) { queue.length = 0; }
-
         // 商品卡指向嘅網址記低做「詳細頁」，之後唔會再爬
         for (const p of r.products) if (p.link) detailPages.add(normKey(p.link));
 
+        // 由嵌入資料一次過攞齊晒全部商品 → 收工，唔好再排任何子頁。
+        // （之前只係清空隊列，但下面段 code 照樣行，--follow-products
+        //   又會把成 400 條商品詳細頁重新排隊，白行成半個鐘。）
+        if (r.fromEmbedded) {
+          queue.length = 0;
+          console.log(`  ✅ 已攞齊全部商品，唔使再爬其他頁`);
+        }
         // --crawl：自動排隊去抓分頁同分類頁
-        if (CRAWL && r.links) {
+        else if (CRAWL && r.links) {
           const queued = new Set(queue.map(normKey));
           const cand = [...r.links.paging, ...r.links.section];
           // --follow-products：連商品詳細頁都排隊（用嚟行商品網絡）
