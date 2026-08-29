@@ -673,12 +673,8 @@ function fetchNissenProduct_(url) {
       } catch(e3) {}
     }
 
-    // 翻譯日文→繁中（只翻譯含日文字符的文字）
-    if (result.name) result.name = nissenTranslate_(result.name);
-    result.variants.forEach(function(v) {
-      v.group = nissenTranslate_(v.group);
-      v.options.forEach(function(o) { if (o.name) o.name = nissenTranslate_(o.name); });
-    });
+    // 翻譯日文→繁中（一次過譯晒，唔好逐個字串叫一次）
+    translateProductInPlace_(result);
 
     return result;
   } catch(e) {
@@ -772,17 +768,44 @@ function fetchZozoProduct_(url) {
       return { error: 'ZOZOTOWN 讀唔到商品資料，可能係網址唔啱或者網站暫時擋咗。請稍後再試。' };
     }
 
-    // 翻譯日文→繁中
-    if (result.name) result.name = nissenTranslate_(result.name);
-    result.variants.forEach(function(v) {
-      v.group = nissenTranslate_(v.group);
-      v.options.forEach(function(o) { if (o.name) o.name = nissenTranslate_(o.name); });
-    });
+    // 翻譯日文→繁中：一次過譯晒，唔好逐個字串叫一次
+    // （一件貨有七、八隻顏色就要等七、八次翻譯，前台會一直「查詢中」）
+    translateProductInPlace_(result);
 
     return result;
   } catch(e) {
     return { error: '抓取失敗：' + e.toString() };
   }
+}
+
+// 收集商品名同所有款式名，合併成一次 LanguageApp 呼叫再派返落去
+function translateProductInPlace_(result) {
+  var slots = [];   // { get, set }
+  if (result.name) slots.push({ v: result.name, set: function(t){ result.name = t; } });
+  (result.variants || []).forEach(function(g) {
+    slots.push({ v: g.group, set: function(t){ g.group = t; } });
+    (g.options || []).forEach(function(o) {
+      if (o.name) slots.push({ v: o.name, set: function(t){ o.name = t; } });
+    });
+  });
+
+  var JP = /[぀-ヿ一-鿿＀-￯]/;
+  var need = [];
+  slots.forEach(function(s, i) { if (s.v && JP.test(s.v)) need.push(i); });
+  if (!need.length) return;
+
+  try {
+    var joined = need.map(function(i){ return slots[i].v; }).join('\n');
+    var out = LanguageApp.translate(joined, 'ja', 'zh-TW') || '';
+    var parts = out.split('\n');
+    // 行數對得返先套用，唔係就保留原文，好過譯錯位
+    if (parts.length === need.length) {
+      need.forEach(function(idx, k) {
+        var t = (parts[k] || '').trim();
+        if (t) slots[idx].set(t);
+      });
+    }
+  } catch(e) { /* 譯唔到就保留日文原文 */ }
 }
 
 function nissenTranslate_(text) {
