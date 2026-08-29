@@ -14,6 +14,7 @@
  * 常用選項：
  *   --crawl               ⭐ 自動跟住分頁／分類連結去抓（商品分散喺多個頁面時必用）
  *   --max-pages 60        --crawl 最多抓幾多頁（預設 60）
+ *   --follow-products     ⭐ 連商品詳細頁都行（網站冇商品列表頁時要用，配大 --max-pages）
  *   --venue-only          ⭐ 剔走「🌐網購限定」商品，只留親身去到會場買得到嘅
  *   --strict-venue        再嚴格啲：淨係要明確標住「🏬會場限定」嗰啲
  *   --expect 400          ⭐ 預期最少幾多件；唔夠會出警告（防止頁面冇載入齊）
@@ -52,10 +53,90 @@ const VENUE_ONLY   = !!flag('venue-only', false) || STRICT_VENUE;
 const CHROME_PATH  = flag('chrome-path', process.env.CHROME_PATH || '');
 const CRAWL        = !!flag('crawl', false);
 const MAX_PAGES    = parseInt(flag('max-pages', '60'));
+const FOLLOW_PRODUCTS = !!flag('follow-products', false);
 
 if (!urls.length) {
   console.error('❌ 請提供至少一條網址，例如：\n   node tools/scrape-goods.mjs "https://chiikawapark-tokyo.jp/goods/"');
   process.exit(1);
+}
+
+// ── 優先路徑：直接讀 Next.js 嵌喺頁面嘅商品資料 ──────────────
+// 好多日本商品網站用 Next.js，成個商品目錄（連分頁後面嗰啲）都已經
+// 塞咗喺 self.__next_f 入面，分頁純粹係前端切開嚟顯示。
+// 讀返呢份資料 = 一次過攞齊全部商品，唔使爬幾十頁，而且
+// 「オンライン販売対象」呢類標示係官方欄位，比掃描文字準確得多。
+function extractNextJsGoods() {
+  const chunks = (self.__next_f || [])
+    .map(x => (Array.isArray(x) ? x[1] : null))
+    .filter(s => typeof s === 'string');
+  if (!chunks.length) return null;
+  const blob = chunks.join('');
+
+  // 由 "goodsItems":[ 開始做括號配對，抽出完整 JSON 陣列
+  const key = '"goodsItems":';
+  const at = blob.indexOf(key);
+  if (at < 0) return null;
+  const start = blob.indexOf('[', at);
+  if (start < 0) return null;
+
+  let depth = 0, inStr = false, esc = false, end = -1;
+  for (let i = start; i < blob.length; i++) {
+    const c = blob[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '[') depth++;
+    else if (c === ']') { depth--; if (depth === 0) { end = i + 1; break; } }
+  }
+  if (end < 0) return null;
+
+  let items;
+  try { items = JSON.parse(blob.slice(start, end)); } catch (e) { return null; }
+  if (!Array.isArray(items) || !items.length) return null;
+
+  // 價錢：「¥4,180（税込）」「各¥1,430」「単品 ¥660／ BOX ¥3,960円」
+  // ⚠️ 有啲條目打錯用句號做千位分隔（例：¥1.980），要當成 1980
+  const parseYen = (txt) => {
+    const m = (txt || '').match(/[¥￥]\s*([0-9][0-9.,]*)|([0-9][0-9.,]*)\s*円/);
+    if (!m) return 0;
+    let raw = (m[1] || m[2] || '');
+    raw = raw.replace(/[.,](?=\d{3}\b)/g, '');   // 千位分隔（逗號或句號）
+    raw = raw.replace(/[.,]/g, '');
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const origin = location.origin;
+  const abs = u => (!u ? '' : (/^https?:/i.test(u) ? u : origin + (u.startsWith('/') ? '' : '/') + u));
+
+  const out = [];
+  for (const it of items) {
+    const name = (it.title || '').replace(/\s+/g, ' ').trim();
+    if (!name) continue;
+    const price = parseYen(it.price);
+    if (!price) continue;
+
+    const cat02 = Array.isArray(it.category_02) ? it.category_02 : [];
+    const alsoOnline = cat02.some(c => /オンライン(ストア|ショップ)?(販売)?対象(?!外)/.test(c));
+
+    const tags = [];
+    if (alsoOnline) tags.push('🛒網上都有');
+    else tags.push('🏬會場限定');          // 冇標「販売対象」＝唔上網賣＝淨係現場有
+    if (it.limitText) tags.push('⚠️有購買限制');
+
+    out.push({
+      name, price,
+      imgUrl:   abs(it.images && it.images[0] && it.images[0].url),
+      link:     origin + '/goods/' + (it.id || '') + '/',
+      category: it.category || '',
+      tags,
+      limitPerPerson: '',
+      priceRaw: it.price || '',            // 原文，方便核對「単品／BOX」呢類複合價
+      onlineUrl: it.purchase_url || '',
+    });
+  }
+  return out.length ? out : null;
 }
 
 // ── 喺瀏覽器入面行嘅抓取邏輯 ────────────────────────────────
@@ -181,6 +262,28 @@ function extractInPage(debugMode) {
     out.push({ name, price, imgUrl, link, category, tags, limitPerPerson });
   }
 
+  // 3b) 單件商品詳細頁：頁面本身嗰件貨唔會排成「卡」，要另外抽返。
+  //     用 og:title / h1 做名，再搵一個唔喺任何卡入面嘅價錢。
+  (() => {
+    const meta = n => (document.querySelector(`meta[property="${n}"]`) || {}).content || '';
+    let name = clean(meta('og:title') || (document.querySelector('h1') || {}).textContent || '');
+    // 剝走「｜網站名」呢類後綴
+    name = name.replace(/\s*[|｜]\s*[^|｜]{0,30}$/, '').trim();
+    if (!name || name.length < 3) return;
+    const outside = leaves.filter(el => !cardArr.some(c => c.contains(el)));
+    let price = null;
+    for (const el of outside) { price = parsePrice(el.textContent); if (price) break; }
+    if (!price) return;
+    const scan = clean(document.body.textContent).slice(0, 4000);
+    const tg = [...new Set(TAG_PATTERNS.filter(t => t.re.test(scan)).map(t => t.tag))];
+    const lm = scan.match(LIMIT_RE);
+    out.unshift({
+      name, price,
+      imgUrl: meta('og:image'), link: location.href, category: '',
+      tags: tg, limitPerPerson: lm ? parseInt(toHalfWidth(lm[1]), 10) || '' : '',
+    });
+  })();
+
   // 4) 去重（同名同價當作同一件）
   const seen = new Set();
   const products = out.filter(p => {
@@ -244,12 +347,12 @@ function toCsv(products, rate) {
 
 // 第二個檔案：畀你自己篩選／排序用（標籤獨立一欄，方便 filter 網購限定）
 function toReviewCsv(products) {
-  const header = ['商品名稱', '日幣原價', '標籤', '分類', '每人限購', '商品連結', '圖片'];
+  const header = ['商品名稱', '日幣原價', '價錢原文', '標籤', '分類', '每人限購', '商品連結', '官方網購連結', '圖片'];
   const lines = [header.map(csvCell).join(',')];
   products.forEach(p => {
     lines.push([
-      p.name, p.price, (p.tags || []).join(' ／ '),
-      p.category || '', p.limitPerPerson || '', p.link || '', p.imgUrl || '',
+      p.name, p.price, p.priceRaw || '', (p.tags || []).join(' ／ '),
+      p.category || '', p.limitPerPerson || '', p.link || '', p.onlineUrl || '', p.imgUrl || '',
     ].map(csvCell).join(','));
   });
   return '﻿' + lines.join('\r\n') + '\r\n';
@@ -359,6 +462,13 @@ async function scrapeBrowser(url, page) {
     });
     await page.waitForTimeout(800);
 
+    // 先試讀 Next.js 嵌入資料：成功嘅話一次過攞齊全部商品，唔使揭頁
+    const nextGoods = await page.evaluate(extractNextJsGoods).catch(() => null);
+    if (nextGoods && nextGoods.length) {
+      console.log(`  ⚡ 由頁面嵌入資料直接讀到 ${nextGoods.length} 件（唔使逐頁爬）`);
+      return { products: nextGoods, debug: null, links: { paging: [], section: [] }, fromEmbedded: true };
+    }
+
     console.log('  → 抽取商品資料…');
     const result = await page.evaluate(extractInPage, DEBUG);
     // 順手記低呢一頁見到嘅分頁／分類連結，畀 --crawl 用
@@ -408,8 +518,10 @@ async function scrapeBrowser(url, page) {
       const url = queue.shift();
       const key = normKey(url);
       if (visited.has(key)) continue;
-      // 開頭指定嘅網址一定要抓；其餘一旦認出係商品詳細頁就略過
-      if (detailPages.has(key) && !startKeys.has(key)) { skippedDetail++; continue; }
+      // 商品詳細頁：預設略過（爬列表頁效率高好多）。
+      // 但有啲網站根本冇商品列表頁，啲貨淨係靠「相關商品」互相連住 ——
+      // 嗰陣就要 --follow-products，行勻成個商品網絡。
+      if (detailPages.has(key) && !startKeys.has(key) && !FOLLOW_PRODUCTS) { skippedDetail++; continue; }
       visited.add(key);
       pagesDone++;
 
@@ -420,15 +532,22 @@ async function scrapeBrowser(url, page) {
         all.push(...r.products);
         if (r.debug) debugDumps.push({ url, ...r.debug });
 
+        // 由嵌入資料一次過攞齊咗，就唔使再爬任何子頁
+        if (r.fromEmbedded) { queue.length = 0; }
+
         // 商品卡指向嘅網址記低做「詳細頁」，之後唔會再爬
         for (const p of r.products) if (p.link) detailPages.add(normKey(p.link));
 
         // --crawl：自動排隊去抓分頁同分類頁
         if (CRAWL && r.links) {
           const queued = new Set(queue.map(normKey));
-          const fresh = [...r.links.paging, ...r.links.section].filter(u => {
+          const cand = [...r.links.paging, ...r.links.section];
+          // --follow-products：連商品詳細頁都排隊（用嚟行商品網絡）
+          if (FOLLOW_PRODUCTS) for (const p of r.products) if (p.link) cand.push(p.link);
+          const fresh = cand.filter(u => {
             const k = normKey(u);
-            return !visited.has(k) && !queued.has(k) && !detailPages.has(k);
+            return !visited.has(k) && !queued.has(k) &&
+                   (FOLLOW_PRODUCTS || !detailPages.has(k));
           });
           if (fresh.length) {
             queue.push(...fresh);

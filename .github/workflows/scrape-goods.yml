@@ -15,10 +15,14 @@ on:
         description: '自動跟住分頁／分類連結逐頁抓（商品分散喺多個頁面時要開）'
         type: boolean
         default: true
+      follow_products:
+        description: '連商品詳細頁都行（網站冇商品列表頁時要開，例如 ちいかわパーク）'
+        type: boolean
+        default: true
       max_pages:
-        description: '自動抓最多幾多頁'
+        description: '自動抓最多幾多頁（行商品網絡要調大，例如 300）'
         required: false
-        default: '60'
+        default: '300'
       venue_only:
         description: '只要現場買得到嘅貨（剔走「オンライン限定」）'
         type: boolean
@@ -70,6 +74,7 @@ jobs:
           ARGS=""
           if [ "${{ inputs.venue_only }}" = "true" ]; then ARGS="$ARGS --venue-only"; fi
           if [ "${{ inputs.crawl }}" = "true" ]; then ARGS="$ARGS --crawl --max-pages ${{ inputs.max_pages }}"; fi
+          if [ "${{ inputs.follow_products }}" = "true" ]; then ARGS="$ARGS --follow-products"; fi
           if [ "${{ inputs.expect }}" != "0" ]; then ARGS="$ARGS --expect ${{ inputs.expect }}"; fi
           ARGS="$ARGS --max-scroll ${{ inputs.max_scroll }} --rate ${{ inputs.twd_rate }} --debug"
 
