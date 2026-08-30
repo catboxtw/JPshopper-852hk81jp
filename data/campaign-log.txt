@@ -1,0 +1,32 @@
+
+▶ ZOZOTOWN · 人氣排行
+  https://zozo.jp/ranking/
+  ❌ page.goto: Timeout 45000ms exceeded.
+Call log:
+  - navigating to "https://zozo.jp/ranking/", waiting until "domcontentloaded"
+
+
+▶ ZOZOTOWN · 特價
+  https://zozo.jp/sale/
+  ❌ page.goto: Timeout 45000ms exceeded.
+Call log:
+  - navigating to "https://zozo.jp/sale/", waiting until "domcontentloaded"
+
+
+▶ Nissen · 人氣排行
+  https://www.nissen.co.jp/ranking/
+  ❌ HTTP 404，跳過
+
+▶ Nissen · 特價
+  https://www.nissen.co.jp/sale/
+  ❌ HTTP 404，跳過
+
+▶ Nissen · 首頁推介
+  https://www.nissen.co.jp/
+  ✅ 0 件（冇）
+
+──────────────────────────────
+共 0 件（原始 0 件，去重後揀頭 24）
+campaign.html ／ campaign-2026-08-30.csv ／ campaign.json → data/
+
+⚠️  一件都抓唔到。加 --debug 再行，睇 campaign-debug.json 入面嘅頁面結構。
