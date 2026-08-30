@@ -11,11 +11,11 @@
  *   campaign-<日期>.csv    ── 同一批貨嘅表格，開 Excel 睇
  *   campaign.json          ── 機器讀嘅版本（下次抓可以比對出新貨）
  *
- * 抓唔到嘢嘅時候加 --debug，會出 campaign-debug.json，
- * 入面有頁面真實結構，唔使估。
+ * 抓唔到嘢嘅時候唔使估：campaign-debug.json 一定有（逐版嘅結構同錯誤），
+ * 而抽唔到貨嘅版仲會留低真實 HTML 喺 campaign-pages/。
  */
 
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 
 // ── 指令參數 ──────────────────────────────────────────────
@@ -35,8 +35,10 @@ const OUT_DIR   = flag('out', 'data');
 const LIMIT     = parseInt(flag('limit', '24')) || 24;
 const DEBUG     = !!flag('debug', false);
 const HEADFUL   = !!flag('headful', false);
-const TIMEOUT   = parseInt(flag('timeout', '45000')) || 45000;
+const TIMEOUT   = parseInt(flag('timeout', '60000')) || 60000;
 const MAX_SCROLL = parseInt(flag('max-scroll', '12')) || 12;
+const DISCOVER_MAX = parseInt(flag('discover-max', '6')) || 6;
+const HUB_OVERRIDE = flag('hub', '') || '';
 
 const SUPA_URL = flag('supabase-url', 'https://pksqfpirggvsftvqrtji.supabase.co');
 const SUPA_KEY = flag('supabase-key', process.env.SUPABASE_ANON_KEY || '');
@@ -44,10 +46,22 @@ let RATE_HK = parseFloat(flag('rate-hk', '0.057'));
 let RATE_TW = parseFloat(flag('rate-tw', '0.24'));
 
 // ── 每間鋪抓邊幾版 ────────────────────────────────────────
+//
+// 寫死網址行唔通 —— 兩間鋪都改過版，估錯就 404。
+// 所以由首頁入手，睇住連結上面寫「ランキング」「セール」嗰啲跟入去，
+// 佢哋改網址都仲搵得返。sources 係已知行得通嘅，行唔通就 fallback 去搵。
+const HUB_HINT = {
+  text: /ランキング|売れ筋|人気|セール|SALE|お買い得|アウトレット|OUTLET|特集|新着/i,
+  href: /rank|sale|outlet|bargain|feature|special|campaign|tokushu|new/i,
+  // 呢啲一定唔係貨架，唔好跟
+  skip: /login|mypage|cart|help|guide|about|privacy|policy|company|recruit|contact|faq|member|coupon\/?$|app\/?$/i,
+};
+
 const SITES = {
   zozo: {
     label: 'ZOZOTOWN',
     host: 'zozo.jp',
+    hub: 'https://zozo.jp/',
     sources: [
       { name: '人氣排行', url: 'https://zozo.jp/ranking/' },
       { name: '特價',     url: 'https://zozo.jp/sale/' },
@@ -56,11 +70,9 @@ const SITES = {
   nissen: {
     label: 'Nissen',
     host: 'nissen.co.jp',
-    sources: [
-      { name: '人氣排行', url: 'https://www.nissen.co.jp/ranking/' },
-      { name: '特價',     url: 'https://www.nissen.co.jp/sale/' },
-      { name: '首頁推介', url: 'https://www.nissen.co.jp/' },
-    ],
+    hub: 'https://www.nissen.co.jp/',
+    // 上次估嘅 /ranking/ 同 /sale/ 都係 404，所以一開始就由首頁搵起
+    sources: [],
   },
 };
 
@@ -240,6 +252,35 @@ function extractInPage() {
   };
 }
 
+// ── 喺首頁搵貨架連結（一樣要 serialize 落瀏覽器）──────────
+function discoverInPage(hint) {
+  const text = new RegExp(hint.text, 'i');
+  const href = new RegExp(hint.href, 'i');
+  const skip = new RegExp(hint.skip, 'i');
+  const seen = new Set();
+  const out = [];
+
+  for (const a of document.querySelectorAll('a[href]')) {
+    const h = a.getAttribute('href') || '';
+    if (!h || h.startsWith('javascript') || h.startsWith('#') || h.startsWith('mailto')) continue;
+
+    let abs;
+    try { abs = new URL(h, location.href).href; } catch (e) { continue; }
+    if (new URL(abs).host !== location.host) continue;
+    if (skip.test(abs)) continue;
+
+    const label = (a.innerText || a.getAttribute('title') || '').trim().slice(0, 40);
+    const hit = text.test(label) || href.test(abs);
+    if (!hit) continue;
+
+    const key = abs.split('?')[0].replace(/\/$/, '');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ url: abs, label: label || abs.replace(location.origin, '') });
+  }
+  return out;
+}
+
 // ── 匯率：同 admin 嗰版設定一致 ────────────────────────────
 async function loadRates() {
   if (!SUPA_KEY) return;
@@ -364,7 +405,7 @@ function toHtml(items, meta) {
   撳最底行字會去返商品原頁，落單／查尺碼用。
 </p>
 ${items.length ? `<div class="grid">${items.map((i, n) => card(i, n + 1)).join('')}</div>`
-  : `<p class="empty">今次抓唔到貨。<br>去 Actions 嗰個 run 下載 <code>campaign-debug.json</code> 睇下頁面結構變咗啲乜。</p>`}
+  : `<p class="empty">今次抓唔到貨。<br><code>data/campaign-debug.json</code> 有逐版嘅結構同錯誤，<br><code>data/campaign-pages/</code> 有頁面真實 HTML。</p>`}
 </body></html>`;
 }
 
@@ -377,6 +418,81 @@ async function main() {
 
   await loadRates();
 
+  // 上次失敗留低嘅 HTML 要清走，否則修好咗都仲見到舊嘢
+  try { rmSync(join(OUT_DIR, 'campaign-pages'), { recursive: true, force: true }); } catch (e) {}
+
+  const browser = await chromium.launch({
+    headless: !HEADFUL,
+    executablePath: process.env.CHROME_PATH || undefined,
+    // 唔好向網站自報係自動化瀏覽器，ZOZO 前面隻 bot 防護會即刻晾低你
+    args: ['--disable-blink-features=AutomationControlled'],
+  });
+  const ctx = await browser.newContext({
+    locale: 'ja-JP',
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
+               '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    viewport: { width: 1280, height: 1600 },
+    extraHTTPHeaders: {
+      'Accept-Language': 'ja,en;q=0.8',
+      'Upgrade-Insecure-Requests': '1',
+    },
+  });
+  await ctx.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+
+  const diags = [];
+
+  // 去一版嘢。ZOZO 上次喺 domcontentloaded 度等足 45 秒都未返 ——
+  // 佢個 bot 防護會拖住條連線。所以只等 response header（commit），
+  // 之後自己等內容出現，等唔到都照抽，起碼有幾多攞幾多。
+  async function open(page, url) {
+    let resp = null, err = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        resp = await page.goto(url, { waitUntil: 'commit', timeout: TIMEOUT });
+        err = null;
+        break;
+      } catch (e) {
+        err = e;
+        if (attempt < 2) await page.waitForTimeout(3000);
+      }
+    }
+    if (err) throw err;
+
+    // 等到見到商品資料或者一堆圖，最多等 TIMEOUT
+    await page.waitForFunction(
+      () => document.getElementById('__NEXT_DATA__') ||
+            document.querySelectorAll('img').length > 20 ||
+            document.readyState === 'complete',
+      null, { timeout: TIMEOUT },
+    ).catch(() => {});
+    return resp;
+  }
+
+  async function harvest(page, job) {
+    for (let i = 0; i < MAX_SCROLL; i++) {
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.9));
+      await page.waitForTimeout(350);
+    }
+    await page.waitForTimeout(800);
+    const r = await page.evaluate(extractInPage);
+    diags.push({ ...job, ...r.diag, found: r.items.length });
+
+    // 一件都抽唔到就留低真實 HTML —— 冇佢就要靠估頁面結構
+    if (r.items.length === 0 || DEBUG) {
+      try {
+        const html = await page.content();
+        const dir = join(OUT_DIR, 'campaign-pages');
+        if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+        const safe = job.url.replace(/^https?:\/\//, '').replace(/[^\w.-]+/g, '_').slice(0, 80);
+        writeFileSync(join(dir, `${safe}.html`), html.slice(0, 150000));
+      } catch (e) {}
+    }
+    return r;
+  }
+
+  // ── 砌工作清單，Nissen 嗰啲要即場喺首頁搵 ──
   const jobs = [];
   if (customUrls.length) {
     const key = siteKeys[0] || 'zozo';
@@ -386,28 +502,40 @@ async function main() {
       const s = SITES[key];
       if (!s) { console.log(`⚠️  唔識「${key}」呢間鋪，跳過`); continue; }
       s.sources.forEach(src => jobs.push({ site: s.label, source: src.name, url: src.url, key }));
+
+      const hub = HUB_OVERRIDE || s.hub;
+      if (s.sources.length === 0 && hub) {
+        console.log(`\n🔎 ${s.label}：喺首頁搵貨架連結\n  ${hub}`);
+        const page = await ctx.newPage();
+        try {
+          await open(page, hub);
+          const found = await page.evaluate(discoverInPage, {
+            text: HUB_HINT.text.source,
+            href: HUB_HINT.href.source,
+            skip: HUB_HINT.skip.source,
+          });
+          diags.push({ site: s.label, source: '首頁搵連結', url: hub, discovered: found });
+          console.log(`  搵到 ${found.length} 條，試頭 ${DISCOVER_MAX} 條：`);
+          found.slice(0, DISCOVER_MAX).forEach(f => {
+            console.log(`    · ${f.label}　${f.url}`);
+            jobs.push({ site: s.label, source: f.label || '推介', url: f.url, key });
+          });
+        } catch (e) {
+          console.log(`  ❌ 連首頁都開唔到：${e.message}`);
+          diags.push({ site: s.label, source: '首頁搵連結', url: hub, error: e.message.split('\n')[0] });
+        }
+        await page.close();
+      }
     }
   }
 
-  const browser = await chromium.launch({
-    headless: !HEADFUL,
-    executablePath: process.env.CHROME_PATH || undefined,
-  });
-  const ctx = await browser.newContext({
-    locale: 'ja-JP',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 ' +
-               '(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    viewport: { width: 1280, height: 1600 },
-  });
-
   const all = [];
-  const diags = [];
 
   for (const job of jobs) {
     console.log(`\n▶ ${job.site} · ${job.source}\n  ${job.url}`);
     const page = await ctx.newPage();
     try {
-      const resp = await page.goto(job.url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT });
+      const resp = await open(page, job.url);
       const status = resp ? resp.status() : 0;
       if (status >= 400) {
         console.log(`  ❌ HTTP ${status}，跳過`);
@@ -416,24 +544,15 @@ async function main() {
         continue;
       }
 
-      // 圖片多數係 lazy load，捲落去先影得到
-      for (let i = 0; i < MAX_SCROLL; i++) {
-        await page.evaluate(() => window.scrollBy(0, window.innerHeight * 0.9));
-        await page.waitForTimeout(350);
-      }
-      await page.waitForTimeout(800);
-
-      const r = await page.evaluate(extractInPage);
-      diags.push({ ...job, status, ...r.diag, found: r.items.length });
-
+      const r = await harvest(page, { ...job, status });
       const tagged = r.items
         .filter(i => i.yen > 0 && i.image)
         .map(i => ({ ...i, site: job.site, source: job.source }));
       console.log(`  ✅ ${tagged.length} 件（${r.items[0]?.from || '冇'}）`);
       all.push(...tagged);
     } catch (e) {
-      console.log(`  ❌ ${e.message}`);
-      diags.push({ ...job, error: e.message });
+      console.log(`  ❌ ${e.message.split('\n')[0]}`);
+      diags.push({ ...job, error: e.message.split('\n')[0] });
     }
     await page.close();
   }
@@ -460,15 +579,15 @@ async function main() {
   writeFileSync(join(OUT_DIR, 'campaign.json'),
     JSON.stringify({ date, rateHk: RATE_HK, rateTw: RATE_TW, items }, null, 2));
 
-  if (DEBUG) {
-    writeFileSync(join(OUT_DIR, 'campaign-debug.json'), JSON.stringify(diags, null, 2));
-  }
+  // 診斷檔一律出。佢細，而且冇佢就要靠估 —— 唔值得慳。
+  writeFileSync(join(OUT_DIR, 'campaign-debug.json'), JSON.stringify(diags, null, 2));
 
   console.log(`\n──────────────────────────────`);
   console.log(`共 ${items.length} 件（原始 ${all.length} 件，去重後揀頭 ${LIMIT}）`);
   console.log(`campaign.html ／ campaign-${date}.csv ／ campaign.json → ${OUT_DIR}/`);
   if (items.length === 0) {
-    console.log(`\n⚠️  一件都抓唔到。加 --debug 再行，睇 campaign-debug.json 入面嘅頁面結構。`);
+    console.log(`\n⚠️  一件都抓唔到。睇 ${OUT_DIR}/campaign-debug.json（逐版結構）`);
+    console.log(`   同 ${OUT_DIR}/campaign-pages/（真實 HTML）—— 貼返俾 Claude 就改得啱。`);
     process.exitCode = 1;
   }
 }

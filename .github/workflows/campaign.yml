@@ -21,7 +21,7 @@ on:
         required: false
         default: '24'
       debug:
-        description: '出 campaign-debug.json（抓唔到貨時開）'
+        description: '每一版都留低原始 HTML（唔開就淨係留抓唔到貨嗰啲）'
         type: boolean
         default: false
 
@@ -59,10 +59,7 @@ jobs:
             zozo)   ARGS="$ARGS --site zozo" ;;
             nissen) ARGS="$ARGS --site nissen" ;;
           esac
-          # 排程跑嘅時候一律開 debug，出事先有線索追
-          if [ "${{ inputs.debug }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
-            ARGS="$ARGS --debug"
-          fi
+          if [ "${{ inputs.debug }}" = "true" ]; then ARGS="$ARGS --debug"; fi
 
           echo "▶ node tools/fetch-campaign.mjs $ARGS"
           node tools/fetch-campaign.mjs $ARGS 2>&1 | tee campaign-log.txt
@@ -107,7 +104,7 @@ jobs:
               echo ""
               echo "（Vercel 部署完先睇到，通常一兩分鐘。亦可以喺 repo 睇 \`data/campaign-$(date +%F).csv\`）"
             else
-              echo "❌ **抓唔到貨** —— 睇下面 log，同下載 \`campaign-debug.json\`"
+              echo "❌ **抓唔到貨** —— 睇 \`data/campaign-debug.json\`（逐版結構）同 \`data/campaign-pages/\`（真實 HTML）"
             fi
             echo ""
             echo "### 執行記錄"
@@ -126,6 +123,7 @@ jobs:
             data/campaign-*.csv
             data/campaign.json
             data/campaign-debug.json
+            data/campaign-pages/
             campaign-log.txt
           if-no-files-found: warn
           retention-days: 30
