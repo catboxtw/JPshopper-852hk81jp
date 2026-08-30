@@ -394,6 +394,12 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === "getKhw1Product") {
+    var khw1Result = fetchKhw1Product_(param.url || '');
+    return ContentService.createTextOutput(JSON.stringify(khw1Result))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === "getNissenFeatured") {
     // 1. 讀取每日快取（最快，不佔 quota）
     var campItems = getNissenCampaignCached_();
@@ -948,6 +954,102 @@ function fetchNetseaProduct_(url) {
   }
 }
 
+// =================================================================
+// khw1.com（世界一百貨批發）商品抓取
+// khw1.com 用 Shopline 平台，商品頁內嵌成個商品物件喺
+// app.value('product', JSON.parse('...')) 入面，比 JSON-LD 更齊全
+// （連款式/庫存/預購說明都有），照住抓取階層：內嵌 JSON → JSON-LD →
+// og meta 逐層 fallback。khw1 賣嘅係台灣批發現貨，內容本身已經係
+// 繁體中文，唔好叫 translateProductInPlace_（佢個「係咪日文」判斷式
+// 連中文都會誤判，白白燒 LanguageApp 配額之餘仲有機會譯錯字）。
+// =================================================================
+function fetchKhw1Product_(url) {
+  if (!url || url.indexOf('khw1.com') === -1) {
+    return { error: '請輸入有效的商品網址 (khw1.com)' };
+  }
+  try {
+    var resp = UrlFetchApp.fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.9'
+      },
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (resp.getResponseCode() !== 200) {
+      return { error: '無法讀取商品頁面 (HTTP ' + resp.getResponseCode() + ')' };
+    }
+    var html = resp.getContentText('UTF-8');
+    var result = { name: '', image: null, price: null, variants: [], rawUrl: url };
+
+    // ── 主要路徑：Shopline 頁面內嵌的 product 物件 ──
+    var product = extractEmbeddedJsonParse_(html, /app\.value\('product',\s*JSON\.parse\('/);
+    if (product) {
+      result.name = (product.title_translations &&
+        (product.title_translations['zh-hant'] || product.title_translations['zh-tw'])) || '';
+
+      result.image = (product.media && product.media[0] && product.media[0].images && product.media[0].images.original)
+        ? product.media[0].images.original.url
+        : (product.cover_media_array && product.cover_media_array[0] ? product.cover_media_array[0].original_image_url : null);
+
+      // price_sale.cents > 0 先代表有做緊優惠價，否則用原價
+      var basePrice = (product.price_sale && product.price_sale.cents > 0) ? product.price_sale : product.price;
+      if (basePrice) result.price = basePrice.dollars;
+
+      if (product.field_titles && product.field_titles.length && product.variations && product.variations.length) {
+        var groupName = (product.field_titles[0].name_translations &&
+          product.field_titles[0].name_translations['zh-hant']) || '款式';
+        var options = product.variations.map(function(v) {
+          var optName = (v.fields_translations && v.fields_translations['zh-hant'] && v.fields_translations['zh-hant'][0]) || '';
+          // 預購/現貨都算「有得買」：quantity 淨係現貨庫存，khw1 好多商品係預購(quantity=0)但一樣落到單
+          var inStock = (v.quantity > 0) || product.out_of_stock_orderable === true || product.unlimited_quantity === true;
+          return { name: optName, inStock: inStock };
+        });
+        result.variants.push({ group: groupName, options: options });
+      }
+
+      // 預購到貨日說明（例如「預計10月初-10月中到貨」），冇就唔加呢個欄位
+      if (product.is_preorder && product.preorder_note_translations && product.preorder_note_translations['zh-hant']) {
+        result.note = product.preorder_note_translations['zh-hant'];
+      }
+    }
+
+    // ── 備援 1：JSON-LD Product schema ──
+    if (!result.name) {
+      var ldBlocks = html.match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g) || [];
+      for (var li = 0; li < ldBlocks.length; li++) {
+        var inner = ldBlocks[li].replace(/^<script type="application\/ld\+json">/, '').replace(/<\/script>$/, '');
+        try {
+          var ld = JSON.parse(inner);
+          if (ld && ld['@type'] === 'Product') {
+            result.name = ld.name || '';
+            if (ld.image && ld.image.length) result.image = ld.image[0];
+            if (ld.offers && ld.offers.price) result.price = ld.offers.price;
+            break;
+          }
+        } catch (eLd) { /* 呢個 script block 唔係有效 JSON，跳過 */ }
+      }
+    }
+
+    // ── 備援 2：Open Graph meta ──
+    if (!result.name) {
+      var ogT = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+      if (ogT) result.name = decodeJsString_(ogT[1]);
+    }
+    if (!result.image) {
+      var ogI = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+      if (ogI) result.image = ogI[1];
+    }
+
+    if (!result.name) return { error: '攞唔到商品資料，請確認網址' };
+
+    return result;
+  } catch (e) {
+    return { error: '抓取失敗：' + e.toString() };
+  }
+}
+
 function translateProductInPlace_(result) {
   var slots = [];   // { get, set }
   if (result.name) slots.push({ v: result.name, set: function(t){ result.name = t; } });
@@ -1002,6 +1104,36 @@ function decodeJsString_(s) {
     .replace(/\\t/g, ' ')
     .replace(/\\(["'\/\\])/g, '$1')
     .trim();
+}
+
+// 由 HTML 攞出 `<prefixRegex>'<JS 轉義過嘅 JSON>'` 呢種 pattern 嵌入嘅資料
+// （例如 Shopline 頁面嘅 app.value('product', JSON.parse('...'))）。
+// JS 單引號字串入面嘅轉義規則（\uXXXX 深度、邊個字要轉義）好易同手寫
+// regex 想像唔一樣，最穩陣係逐個字元行過條轉義路徑抽出原始（仍轉義住嘅）
+// 字串內容，再交返俾 JS 引擎自己 eval 做一次「當呢個係字串常量」嘅解碼
+// （同瀏覽器行為一致），先至 JSON.parse 出物件。
+function extractEmbeddedJsonParse_(html, prefixRegex) {
+  var m = html.match(prefixRegex);
+  if (!m) return null;
+  var i = m.index + m[0].length; // 指住緊接住開頭單引號之後嗰個字元
+  var buf = [];
+  while (i < html.length) {
+    var ch = html.charAt(i);
+    if (ch === '\\') {
+      buf.push(ch, html.charAt(i + 1));
+      i += 2;
+      continue;
+    }
+    if (ch === "'") break;
+    buf.push(ch);
+    i++;
+  }
+  try {
+    var jsString = eval("'" + buf.join('') + "'");
+    return JSON.parse(jsString);
+  } catch (e) {
+    return null;
+  }
 }
 
 function nissenTranslate_(text) {
