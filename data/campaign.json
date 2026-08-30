@@ -2,5 +2,18 @@
   "date": "2026-08-30",
   "rateHk": 0.057,
   "rateTw": 0.24,
-  "items": []
+  "items": [
+    {
+      "name": "＜PR＞新規口座開設キャンペーン",
+      "image": "https://www.nissen.co.jp/img/event/260727/260727_7.jpg",
+      "url": "https://www.sbishinseibank.co.jp/campaign/nissen_2607/",
+      "yen": 4500,
+      "origYen": 0,
+      "discount": 0,
+      "brand": "",
+      "from": "dom",
+      "site": "Nissen",
+      "source": "レビュー投稿募集中！1投稿ごとに10ポイントプレゼント"
+    }
+  ]
 }
