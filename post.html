@@ -57,7 +57,16 @@
   .pc a.im img{width:100%;height:100%;object-fit:cover;display:block}
   .pc .bd{padding:11px 12px 13px;display:flex;flex-direction:column;gap:4px;flex:1}
   .pc .br{font-size:10px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
-  .pc .nm{font-size:12.5px;line-height:1.5;font-weight:500;
+  .nmrow{display:flex;gap:6px;align-items:center}
+  .nmedit{flex:1;min-width:0;font-family:inherit;font-size:12.5px;font-weight:500;
+    line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px}
+  .nmedit:focus{outline:2px solid var(--general);outline-offset:1px;background:var(--card)}
+  .undo{border:1px solid var(--border);background:var(--card);color:var(--muted);
+    border-radius:6px;width:26px;height:26px;flex:none;cursor:pointer;
+    font-size:13px;line-height:1;padding:0}
+  .undo:hover{border-color:var(--ink);color:var(--ink)}
+  .pc .orig{font-size:10px;color:var(--muted);line-height:1.5;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .pc .pr{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
   .pc .pr s{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
@@ -305,7 +314,13 @@ function render() {
         </a>
         <div class="bd">
           ${it.brand || it.shop ? `<p class="br">${esc([it.brand, it.shop].filter(Boolean).join(' · '))}</p>` : ''}
-          <p class="nm">${esc(it.name)}</p>
+          <div class="nmrow">
+            <input class="nmedit" data-n="${n}" value="${esc(dispName(it))}" maxlength="40"
+                   aria-label="商品名（出 post 同張卡都用呢個）">
+            <button class="undo" data-undo="${n}" type="button"
+                    title="回復原本嘅名" ${it.editName === undefined ? 'hidden' : ''}>↺</button>
+          </div>
+          <p class="orig" title="${esc(it.name)}">原名：${esc(it.name)}</p>
           <p class="pr">¥${it.yen.toLocaleString()}${it.yenMax && it.yenMax !== it.yen ? '〜' + it.yenMax.toLocaleString() : ''}
             ${it.origYen && it.origYen > it.yen ? `<s>¥${it.origYen.toLocaleString()}</s>` : ''}</p>
           <p class="lo" style="color:var(--${region})">${local(it.yen)}${it.yenMax && it.yenMax !== it.yen ? '起' : ''}</p>
@@ -321,6 +336,32 @@ function render() {
     });
   });
 
+  // 改名唔可以重畫成個列表，唔係打一個字個游標就跳走
+  document.querySelectorAll('.nmedit').forEach(inp => {
+    inp.addEventListener('input', () => {
+      items[+inp.dataset.n].editName = inp.value;
+      // 只更新文案，唔重畫列表；粒回復掣自己現身就得
+      const undo = document.querySelector(`[data-undo="${inp.dataset.n}"]`);
+      if (undo) undo.hidden = false;
+      renderCaption();
+    });
+  });
+  document.querySelectorAll('[data-undo]').forEach(b => {
+    b.addEventListener('click', () => {
+      delete items[+b.dataset.undo].editName;
+      render();
+    });
+  });
+
+  renderCaption();
+}
+
+// 商品名：改過就用改咗嗰個，冇改就用斬短咗嘅原名
+function dispName(it) {
+  return it.editName !== undefined ? it.editName : shortName(it.name);
+}
+
+function renderCaption() {
   const { groups, left, picked } = postGroups();
   const n = perPost();
 
@@ -430,12 +471,12 @@ function buildCaption(list) {
 
   // 逐件貨
   list.slice(0, 6).forEach((it, n) => {
-    const nm = shortName(it.name);
+    const nm = dispName(it);
     // ZOZO 好多商品名已經帶住品牌，唔好再前置多次
     const showBrand = it.brand &&
       !nm.toLowerCase().includes(it.brand.toLowerCase());
     const bits = [`${n + 1}. ${showBrand ? it.brand + ' ' : ''}${nm}`];
-    let price = `　　${local(it.yen)}`;
+    let price = `　　¥${it.yen.toLocaleString()}`;
     if (it.yenMax && it.yenMax !== it.yen) price += '起';
     if (it.discount) price += hk ? `（減緊 ${it.discount}%）` : `（${it.discount}% OFF）`;
     bits.push(price);
@@ -610,14 +651,17 @@ async function drawCard(item, seq) {
   // 商品名，最多兩行
   ctx.fillStyle = CARD.ink;
   ctx.font = '500 54px "Noto Serif TC", serif';
-  wrapText(ctx, shortName(item.name), 600, 2)
+  wrapText(ctx, dispName(item), 600, 2)
     .forEach((ln, i) => ctx.fillText(ln, M, 1086 + i * 68));
 
   // 日圓價（唔出港幣／台幣 —— 匯率會變，張卡會留喺 feed 好耐）
   ctx.textAlign = 'right';
   ctx.fillStyle = accent;
   ctx.font = '500 56px "IBM Plex Mono", monospace';
-  ctx.fillText('¥' + item.yen.toLocaleString(), R, 1080);
+  // 唔同碼唔同價嗰啲要寫「起」，唔係人哋照住最平嗰個價嚟問就麻煩
+  const yenTxt = '¥' + item.yen.toLocaleString() +
+    (item.yenMax && item.yenMax !== item.yen ? '起' : '');
+  ctx.fillText(yenTxt, R, 1080);
 
   ctx.fillStyle = CARD.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
@@ -712,7 +756,7 @@ $('saveBtn').addEventListener('click', async () => {
       caption: buildCaption(grp),
       tags: buildTags(grp),
       items: grp.map((i, k) => ({
-        name: shortName(i.name),
+        name: dispName(i),
         image: cards[k],          // ← 出 post 卡，唔係原相
         url: i.url,
         yen: i.yen,
