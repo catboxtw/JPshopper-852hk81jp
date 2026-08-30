@@ -970,8 +970,12 @@ $('saveBtn').addEventListener('click', async () => {
       items: grp.map((i, k) => ({
         name: dispName(i),
         image: cards[k],          // ← 出 post 卡，唔係原相
+        photo: i.image,           // 原本嘅商品相，選購頁睇細節用
         url: i.url,
         yen: isNetsea(i) ? nsPrice(i) : i.yen,
+        // 日圓要按當時匯率換算，日本雜貨嗰個已經係算好嘅賣價
+        currency: isNetsea(i) ? (region === 'hk' ? 'HKD' : 'TWD') : 'JPY',
+        variants: i.variants || [],
         discount: i.discount || 0,
       })),
     };

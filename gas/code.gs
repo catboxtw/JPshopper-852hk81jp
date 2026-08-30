@@ -382,6 +382,43 @@ function doGet(e) {
     }
   }
 
+  // 公開選購頁讀「已出商品」。呢個唔使登入 —— 本身就係俾客人睇嘅。
+  if (action === "getShopItems") {
+    try {
+      var shSheet = ss.getSheetByName("已出商品");
+      if (!shSheet || shSheet.getLastRow() < 2) {
+        return ContentService.createTextOutput(JSON.stringify({ items: [] }))
+                             .setMimeType(ContentService.MimeType.JSON);
+      }
+      var shRows = shSheet.getRange(2, 1, shSheet.getLastRow() - 1, 11).getValues();
+      var shItems = [];
+      for (var si = shRows.length - 1; si >= 0; si--) {   // 新出嘅行先
+        var r = shRows[si];
+        if (!r[6]) continue;                              // 冇商品網址就跳過
+        if (r[10] === false || r[10] === 'FALSE') continue; // 手動隱藏咗
+        var vs = [];
+        try { vs = r[9] ? JSON.parse(r[9]) : []; } catch (ve) {}
+        shItems.push({
+          date:     r[0] ? Utilities.formatDate(new Date(r[0]), Session.getScriptTimeZone(), "yyyy-MM-dd") : "",
+          region:   r[1] || 'hk',
+          source:   r[2] || '',
+          name:     r[3] || '',
+          card:     r[4] || '',
+          photo:    r[5] || '',
+          url:      r[6] || '',
+          price:    Number(r[7]) || 0,
+          currency: r[8] || 'JPY',
+          variants: vs
+        });
+      }
+      return ContentService.createTextOutput(JSON.stringify({ items: shItems }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    } catch (shErr) {
+      return ContentService.createTextOutput(JSON.stringify({ error: shErr.toString(), items: [] }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
   if (action === "getNetseaProduct") {
     var nsResult = fetchNetseaProduct_(param.url || '');
     return ContentService.createTextOutput(JSON.stringify(nsResult))
@@ -2443,6 +2480,10 @@ function doPost(e) {
 
         pdSheet.appendRow(pdRow);
 
+        // 順手逐件商品存一行入「已出商品」，公開嗰版選購頁就係讀呢個。
+        // 一個 post 三件貨 = 三行，因為客人係逐件揀嘅。
+        savePostedItems_(ss, rowData, pdItems);
+
         return ContentService.createTextOutput(JSON.stringify({
           result: "ok", row: pdSheet.getLastRow(), count: pdItems.length
         })).setMimeType(ContentService.MimeType.JSON);
@@ -3582,6 +3623,59 @@ function getOrderSummary(ss, eventName) {
     result.push({ name: pName, subs: productGroups[pName] });
   }
   return { items: result, batches: batches };
+}
+
+// =================================================================
+// savePostedItems_：出過 post 嘅商品逐件存一行，俾 /shopping 選購頁讀。
+// 同一件貨出多次 post 只會留一行（靠商品網址認）。
+// =================================================================
+function savePostedItems_(ss, rowData, items) {
+  if (!items || !items.length) return;
+
+  var HEAD = ["出Post日期", "地區", "來源", "商品名", "出Post圖", "商品相",
+              "商品網址", "價錢", "幣別", "款式", "顯示"];
+  var sh = ss.getSheetByName("已出商品");
+  if (!sh) {
+    sh = ss.insertSheet("已出商品");
+    sh.appendRow(HEAD);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, HEAD.length).setFontWeight("bold");
+  }
+
+  // 已經有嘅商品網址，出多次都唔好重複開行
+  var seen = {};
+  var last = sh.getLastRow();
+  if (last > 1) {
+    var urls = sh.getRange(2, 7, last - 1, 1).getValues();
+    for (var u = 0; u < urls.length; u++) {
+      var k = urls[u][0] ? urls[u][0].toString().trim() : "";
+      if (k) seen[k] = true;
+    }
+  }
+
+  var rows = [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var url = (it.url || "").trim();
+    if (!url || seen[url]) continue;
+    seen[url] = true;
+    rows.push([
+      new Date(),
+      (rowData.region === 'tw') ? 'tw' : 'hk',
+      rowData.shops || "",
+      it.name || "",
+      it.image || "",                    // 出 post 嗰張卡
+      it.photo || "",                    // 原本嘅商品相
+      url,
+      it.yen || 0,
+      it.currency || 'JPY',              // JPY = 要按匯率換算；HKD/TWD = 已經係賣價
+      it.variants ? JSON.stringify(it.variants) : "",
+      true
+    ]);
+  }
+  if (rows.length) {
+    sh.getRange(sh.getLastRow() + 1, 1, rows.length, HEAD.length).setValues(rows);
+  }
 }
 
 // =================================================================

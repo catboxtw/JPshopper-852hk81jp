@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出過嘅商品 — 852hk.81jp</title>
+<meta name="description" content="我哋出過 post 嘅日本代購商品，揀好尺碼款式直接落單。">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f7f6f3; --card:#fff; --ink:#1a1a1a; --muted:#888; --border:#e8e6e1;
+    --hk:#c0392b; --tw:#2980b9; --general:#6d597a; --ok:#2e7d32;
+    --accent:var(--hk);
+  }
+  body{font-family:'Noto Sans HK',sans-serif;background:var(--bg);color:var(--ink);
+       -webkit-font-smoothing:antialiased}
+
+  .topbar{position:sticky;top:0;z-index:60;background:rgba(247,246,243,.94);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px;
+    display:flex;align-items:center;justify-content:space-between;padding:0 18px;gap:10px}
+  .brand{font-family:'Shippori Mincho',serif;font-size:16px;font-weight:600;
+    letter-spacing:3px;color:var(--ink);text-decoration:none;white-space:nowrap}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .seg button{border:none;background:var(--card);padding:7px 12px;font-family:inherit;
+    font-size:12px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--ink);color:#fff}
+  .cartBtn{border:1px solid var(--border);background:var(--card);color:var(--ink);
+    border-radius:8px;padding:7px 12px;font-family:inherit;font-size:12px;cursor:pointer;
+    position:relative;white-space:nowrap}
+  .cartBtn b{color:var(--accent)}
+
+  .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 80px}
+  h1{font-family:'Shippori Mincho',serif;font-size:21px;font-weight:600;margin-bottom:5px}
+  .lede{font-size:12.5px;color:var(--muted);line-height:1.8;margin-bottom:18px}
+
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  @media(min-width:640px){.grid{gap:14px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
+  .it{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    overflow:hidden;cursor:pointer;text-align:left;font-family:inherit;padding:0;
+    display:flex;flex-direction:column;transition:border-color .15s}
+  .it:hover{border-color:var(--ink)}
+  .it .im{aspect-ratio:4/5;background:var(--bg);overflow:hidden}
+  .it .im img{width:100%;height:100%;object-fit:cover;display:block}
+  .it .bd{padding:9px 10px 11px;display:flex;flex-direction:column;gap:3px;flex:1}
+  .it .nm{font-size:12px;line-height:1.5;font-weight:500;color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .it .pr{font-size:13px;font-weight:700;color:var(--accent);
+    font-variant-numeric:tabular-nums;margin-top:auto;padding-top:3px}
+  .it .src{font-size:9.5px;color:var(--muted);letter-spacing:.06em}
+
+  .msg{padding:50px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.9}
+
+  /* ── 商品詳情 ── */
+  .sheet{position:fixed;inset:0;z-index:100;display:none}
+  .sheet.on{display:block}
+  .sheet .bg{position:absolute;inset:0;background:rgba(20,20,20,.45)}
+  .sheet .box{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;
+    background:var(--card);border-radius:16px 16px 0 0;padding:18px 18px 26px}
+  @media(min-width:640px){.sheet .box{left:50%;top:50%;right:auto;bottom:auto;
+    transform:translate(-50%,-50%);width:min(520px,92vw);border-radius:14px;max-height:88vh}}
+  .sheet h2{font-size:15px;font-weight:700;line-height:1.6;margin:0 0 4px;padding-right:34px}
+  .sheet .x{position:absolute;right:14px;top:14px;border:none;background:none;
+    font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:4px}
+  .sheet .hero{width:100%;aspect-ratio:1;object-fit:contain;background:var(--bg);
+    border-radius:10px;margin:10px 0 12px}
+  .sheet .price{font-size:19px;font-weight:700;color:var(--accent);
+    font-variant-numeric:tabular-nums;margin-bottom:4px}
+  .sheet .sub{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:14px}
+
+  .vgroup{margin-bottom:14px}
+  .vgroup h3{font-size:12px;font-weight:700;margin-bottom:7px}
+  .opts{display:flex;flex-wrap:wrap;gap:7px}
+  .opt{border:1px solid var(--border);background:var(--card);color:var(--ink);
+    border-radius:7px;padding:8px 13px;font-family:inherit;font-size:12.5px;cursor:pointer}
+  .opt:hover:not(:disabled){border-color:var(--ink)}
+  .opt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  /* 冇貨嗰啲要一眼睇得出撳唔到，唔係人揀完先話你知就好嬲 */
+  .opt:disabled{color:#c4c4c4;background:#f4f4f4;border-color:#ececec;
+    cursor:not-allowed;text-decoration:line-through}
+
+  .qtyRow{display:flex;align-items:center;gap:10px;margin:16px 0 4px}
+  .qtyRow label{font-size:12px;font-weight:700}
+  .qty{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .qty button{border:none;background:var(--card);width:34px;height:34px;font-size:16px;
+    cursor:pointer;color:var(--ink)}
+  .qty input{width:44px;text-align:center;border:none;border-left:1px solid var(--border);
+    border-right:1px solid var(--border);font-family:inherit;font-size:14px;
+    background:var(--card);color:var(--ink)}
+
+  .big{width:100%;border:none;background:var(--ink);color:#fff;padding:13px;
+    border-radius:9px;font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;
+    margin-top:14px}
+  .big:disabled{opacity:.4;cursor:default}
+  .ghost{width:100%;border:1px solid var(--border);background:var(--card);color:var(--ink);
+    padding:12px;border-radius:9px;font-family:inherit;font-size:13px;cursor:pointer;margin-top:8px}
+  .note{font-size:11.5px;color:var(--muted);line-height:1.8;margin-top:10px}
+  .warn{font-size:12px;color:var(--hk);line-height:1.7;margin-top:8px}
+
+  /* ── 購物車 ── */
+  .line{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+  .line img{width:52px;height:65px;object-fit:cover;border-radius:6px;flex:none;background:var(--bg)}
+  .line .li{flex:1;min-width:0;font-size:12px;line-height:1.6}
+  .line .li b{display:block;font-weight:500}
+  .line .li span{color:var(--muted);font-size:11px}
+  .line .rm{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
+  .tot{display:flex;justify-content:space-between;align-items:baseline;
+    padding:14px 0 2px;font-size:14px;font-weight:700}
+  .tot span{color:var(--accent);font-variant-numeric:tabular-nums}
+
+  .fld{margin-bottom:11px}
+  .fld label{display:block;font-size:12px;font-weight:500;margin-bottom:5px}
+  .fld input,.fld textarea{width:100%;border:1px solid var(--border);border-radius:8px;
+    padding:10px 11px;font-family:inherit;font-size:13.5px;background:var(--bg);color:var(--ink)}
+  .fld input:focus,.fld textarea:focus{outline:2px solid var(--general);outline-offset:1px;
+    background:var(--card)}
+  .fld textarea{min-height:64px;resize:vertical}
+  .req{color:var(--hk)}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--general);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="brand" href="/">852hk.81jp</a>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <div class="seg" id="regSeg">
+      <button type="button" data-r="hk" class="on">🇭🇰 HK</button>
+      <button type="button" data-r="tw">🇹🇼 TW</button>
+    </div>
+    <button class="cartBtn" id="cartBtn" type="button">🛒 <b id="cartN">0</b></button>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1>出過嘅商品</h1>
+  <p class="lede">
+    我哋 IG 出過 post 嘅商品，揀好尺碼款式就落到單。<br>
+    <strong>冇貨嘅款式會變灰色，撳唔到。</strong>
+  </p>
+  <div id="grid" class="grid"></div>
+  <p id="msg" class="msg">載入中…</p>
+</div>
+
+<!-- 商品詳情 -->
+<div class="sheet" id="itemSheet">
+  <div class="bg" data-close></div>
+  <div class="box">
+    <button class="x" type="button" data-close aria-label="關閉">✕</button>
+    <div id="itemBody"></div>
+  </div>
+</div>
+
+<!-- 購物車／落單 -->
+<div class="sheet" id="cartSheet">
+  <div class="bg" data-close></div>
+  <div class="box">
+    <button class="x" type="button" data-close aria-label="關閉">✕</button>
+    <h2>購物車</h2>
+    <div id="cartBody"></div>
+  </div>
+</div>
+
+<script>
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+const SUPA_HEADERS = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
+
+// 匯率每次載入即時攞，所以顯示嘅價錢永遠係當下嗰個
+const CFG = { hk: 0.057, tw: 0.24 };
+let region = (new URLSearchParams(location.search).get('region') === 'tw') ? 'tw' : 'hk';
+let items = [], cart = [], cur = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const sym = () => region === 'hk' ? 'HK$' : 'NT$';
+
+// 日圓要按當下匯率換算；已經係本地幣嘅就照用
+function priceOf(it) {
+  if (it.currency === 'JPY') return Math.ceil(it.price * (region === 'hk' ? CFG.hk : CFG.tw));
+  return Math.round(it.price * 10) / 10;
+}
+const priceTxt = it => sym() + priceOf(it).toLocaleString();
+
+function applyRegion() {
+  document.documentElement.style.setProperty('--accent',
+    region === 'hk' ? '#c0392b' : '#2980b9');
+  document.querySelectorAll('#regSeg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.r === region));
+}
+
+document.querySelectorAll('#regSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    region = b.dataset.r;
+    applyRegion(); renderGrid(); saveCart();
+  });
+});
+
+// ── 載入 ──
+(async () => {
+  applyRegion();
+  loadCart();
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/app_settings?select=key,value', { headers: SUPA_HEADERS });
+    if (r.ok) for (const row of await r.json()) {
+      const v = parseFloat(row.value);
+      if (v > 0 && row.key === 'rate_hk') CFG.hk = v;
+      if (v > 0 && row.key === 'rate_tw') CFG.tw = v;
+    }
+  } catch (e) {}
+
+  try {
+    const res = await fetch(GAS_API_URL + '?action=getShopItems');
+    const d = JSON.parse(await res.text());
+    items = (d.items || []).filter(i => i.card || i.photo);
+    if (!items.length) {
+      $('msg').textContent = '仲未有商品，出咗 post 之後就會喺呢度出現。';
+      return;
+    }
+    $('msg').style.display = 'none';
+    renderGrid();
+  } catch (e) {
+    $('msg').innerHTML = '載入唔到商品清單，請重新整理。<br>' +
+      '<span style="font-size:11px">' + esc(e.message) + '</span>';
+  }
+})();
+
+function renderGrid() {
+  $('grid').innerHTML = items.map((it, n) => `
+    <button class="it" type="button" data-n="${n}">
+      <div class="im"><img src="${esc(it.card || it.photo)}" alt="${esc(it.name)}" loading="lazy"></div>
+      <div class="bd">
+        ${it.source ? `<p class="src">${esc(it.source)}</p>` : ''}
+        <p class="nm">${esc(it.name)}</p>
+        <p class="pr">${priceTxt(it)}</p>
+      </div>
+    </button>`).join('');
+  document.querySelectorAll('.it').forEach(b =>
+    b.addEventListener('click', () => openItem(+b.dataset.n)));
+}
+
+// ── 商品詳情：即場問返仲有冇貨 ──
+async function openItem(n) {
+  const it = items[n];
+  cur = { it, picked: {}, qty: 1, live: null };
+  $('itemSheet').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  drawItem('（查緊仲有冇貨…）');
+
+  // 存低嗰陣嘅款式會過期，所以開嘅時候即場問多次
+  try {
+    const act = /nissen\.co\.jp/i.test(it.url) ? 'getNissenProduct'
+              : /zozo\.jp/i.test(it.url)       ? 'getZozoProduct'
+              : null;
+    if (!act) { cur.live = it.variants || []; drawItem(''); return; }
+    const res = await fetch(`${GAS_API_URL}?action=${act}&url=${encodeURIComponent(it.url)}`);
+    const d = JSON.parse(await res.text());
+    cur.live = (d && d.variants && d.variants.length) ? d.variants : (it.variants || []);
+    drawItem('');
+  } catch (e) {
+    cur.live = it.variants || [];
+    drawItem('查唔到即時庫存，下面係我哋上次記錄嘅款式，落單後我哋會再同你確認。');
+  }
+}
+
+function drawItem(warn) {
+  const { it, picked, qty } = cur;
+  const groups = cur.live === null ? [] : cur.live;
+  const need = groups.filter(g => (g.options || []).length).length;
+  const done = groups.filter(g => picked[g.group] !== undefined).length;
+
+  $('itemBody').innerHTML = `
+    <h2>${esc(it.name)}</h2>
+    <img class="hero" src="${esc(it.photo || it.card)}" alt="">
+    <p class="price">${priceTxt(it)}</p>
+    <p class="sub">
+      ${it.currency === 'JPY'
+        ? `日本售價 ¥${it.price.toLocaleString()}　·　按今日匯率 ${region === 'hk' ? CFG.hk : CFG.tw} 換算`
+        : '已包代購費用'}<br>
+      國際運費另計（只計實重，冇體積重）
+    </p>
+    ${cur.live === null
+      ? '<p class="note">查緊款式…</p>'
+      : groups.map(g => `
+        <div class="vgroup">
+          <h3>${esc(g.group || '款式')}</h3>
+          <div class="opts">
+            ${(g.options || []).map(o => `
+              <button class="opt${picked[g.group] === o.name ? ' on' : ''}" type="button"
+                      data-g="${esc(g.group)}" data-o="${esc(o.name)}"
+                      ${o.inStock ? '' : 'disabled title="冇貨"'}>${esc(o.name || '—')}</button>
+            `).join('')}
+          </div>
+        </div>`).join('')}
+    ${warn ? `<p class="warn">⚠️ ${esc(warn)}</p>` : ''}
+    <div class="qtyRow">
+      <label>數量</label>
+      <div class="qty">
+        <button type="button" id="qDn">−</button>
+        <input id="qN" value="${qty}" inputmode="numeric" readonly>
+        <button type="button" id="qUp">＋</button>
+      </div>
+    </div>
+    <button class="big" id="addBtn" ${cur.live === null || done < need ? 'disabled' : ''}>
+      ${cur.live === null ? '查緊…' : done < need ? `仲要揀 ${need - done} 樣` : '加入購物車'}
+    </button>
+    <a class="ghost" style="display:block;text-align:center;text-decoration:none;"
+       href="${esc(it.url)}" target="_blank" rel="noopener">睇日本原頁 ↗</a>
+    <p class="note">揀好之後會入購物車，可以一次過落幾件。</p>`;
+
+  document.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
+    picked[b.dataset.g] = b.dataset.o;
+    drawItem(warn);
+  }));
+  const q = $('qN');
+  $('qDn').addEventListener('click', () => { cur.qty = Math.max(1, cur.qty - 1); q.value = cur.qty; });
+  $('qUp').addEventListener('click', () => { cur.qty = Math.min(20, cur.qty + 1); q.value = cur.qty; });
+  const add = $('addBtn');
+  if (add && !add.disabled) add.addEventListener('click', addToCart);
+}
+
+function addToCart() {
+  const { it, picked, qty } = cur;
+  const spec = Object.keys(picked).map(k => `${k}：${picked[k]}`).join('／');
+  const key = it.url + '|' + spec;
+  const hit = cart.find(c => c.key === key);
+  if (hit) hit.qty += qty;
+  else cart.push({
+    key, name: it.name, spec, qty,
+    image: it.photo || it.card, url: it.url,
+    price: it.price, currency: it.currency,
+  });
+  saveCart();
+  closeSheets();
+}
+
+// ── 購物車 ──
+function cartKey() { return 'shopCart_' + region; }
+function loadCart() {
+  try { cart = JSON.parse(localStorage.getItem(cartKey()) || '[]'); } catch (e) { cart = []; }
+  $('cartN').textContent = cart.reduce((a, c) => a + c.qty, 0);
+}
+function saveCart() {
+  try { localStorage.setItem(cartKey(), JSON.stringify(cart)); } catch (e) {}
+  $('cartN').textContent = cart.reduce((a, c) => a + c.qty, 0);
+}
+
+$('cartBtn').addEventListener('click', () => {
+  loadCart(); drawCart();
+  $('cartSheet').classList.add('on');
+  document.body.style.overflow = 'hidden';
+});
+
+function lineTotal(c) {
+  const each = c.currency === 'JPY'
+    ? Math.ceil(c.price * (region === 'hk' ? CFG.hk : CFG.tw))
+    : Math.round(c.price * 10) / 10;
+  return Math.round(each * c.qty * 10) / 10;
+}
+
+function drawCart() {
+  if (!cart.length) {
+    $('cartBody').innerHTML = '<p class="msg">購物車係空嘅。</p>';
+    return;
+  }
+  const total = cart.reduce((a, c) => a + lineTotal(c), 0);
+  $('cartBody').innerHTML = `
+    ${cart.map((c, n) => `
+      <div class="line">
+        <img src="${esc(c.image)}" alt="">
+        <div class="li">
+          <b>${esc(c.name)}</b>
+          <span>${esc(c.spec || '—')}　×${c.qty}</span>
+        </div>
+        <div style="text-align:right;font-size:12px;font-weight:700;white-space:nowrap;">
+          ${sym()}${lineTotal(c).toLocaleString()}
+          <button class="rm" type="button" data-rm="${n}" aria-label="刪走">✕</button>
+        </div>
+      </div>`).join('')}
+    <div class="tot"><span style="color:var(--ink)">商品小計</span>
+      <span>${sym()}${Math.round(total * 10) / 10}</span></div>
+    <p class="note" style="margin-bottom:16px;">
+      國際運費同本地派送費另計，我哋收到單之後會 email 俾你確認總數。
+    </p>
+
+    <div class="fld"><label>姓名 <span class="req">*</span></label><input id="fName"></div>
+    <div class="fld"><label>電郵 <span class="req">*</span></label><input id="fEmail" type="email"></div>
+    <div class="fld"><label>電話</label><input id="fPhone" inputmode="tel"></div>
+    <div class="fld"><label>備註</label><textarea id="fRemark"
+      placeholder="收貨方式、其他要求…"></textarea></div>
+    <button class="big" id="okBtn">提交訂單</button>
+    <p class="note" id="okMsg"></p>`;
+
+  document.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+    cart.splice(+b.dataset.rm, 1); saveCart(); drawCart();
+  }));
+  $('okBtn').addEventListener('click', submitOrder);
+}
+
+async function submitOrder() {
+  const name  = ($('fName').value || '').trim();
+  const email = ($('fEmail').value || '').trim();
+  const phone = ($('fPhone').value || '').trim();
+  const remark= ($('fRemark').value || '').trim();
+  if (!name)  { $('okMsg').innerHTML = '<span class="warn">請填姓名</span>'; return; }
+  if (!email.includes('@')) { $('okMsg').innerHTML = '<span class="warn">請填有效電郵</span>'; return; }
+
+  const btn = $('okBtn');
+  btn.disabled = true; btn.textContent = '⏳ 提交中…';
+
+  const now = new Date();
+  const orderNo = 'SP-' + now.getFullYear() +
+    String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') +
+    '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+
+  // 同 Nissen 代購訂單行同一條路，所以後台同付款頁完全唔使改
+  const orderData = {
+    order_no: orderNo, region,
+    customer_name: name, customer_email: email, customer_phone: phone,
+    items: cart.map(c => ({
+      name: c.name, sub: c.spec, qty: c.qty, url: c.url, image: c.image,
+      price: c.currency === 'JPY'
+        ? Math.ceil(c.price * (region === 'hk' ? CFG.hk : CFG.tw))
+        : c.price,
+    })),
+    remark, status: 'pending',
+  };
+
+  try {
+    const res = await fetch(SUPA_URL + '/rest/v1/nissen_orders', {
+      method: 'POST',
+      headers: { ...SUPA_HEADERS, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(orderData),
+    });
+    if (!res.ok) throw new Error(await res.text());
+
+    try {
+      fetch(GAS_API_URL, {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'nissenOrderNotify', order: orderData }),
+      });
+    } catch (e) {}
+
+    localStorage.setItem('nissenOrder_' + orderNo, JSON.stringify(orderData));
+    cart = []; saveCart();
+    location.href = '/nissen-pay?order=' + orderNo;
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '提交訂單';
+    $('okMsg').innerHTML = '<span class="warn">提交唔到，請再試一次。' + esc(e.message) + '</span>';
+  }
+}
+
+// ── 開關 ──
+function closeSheets() {
+  document.querySelectorAll('.sheet').forEach(s => s.classList.remove('on'));
+  document.body.style.overflow = '';
+}
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
+</script>
+</body>
+</html>
