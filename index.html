@@ -781,7 +781,17 @@ async function fetchNissenSlot(slotEl, region, src) {
         <span style="font-size:11px;color:var(--muted);">如果你啱啱先加咗新功能，記住要喺 Apps Script 重新部署（部署 → 管理部署 → 新版本）。</span></p>`;
       return;
     }
-    if (data.error) { resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.error}</p>`; return; }
+    // 舊版 GAS 未認得呢個指令時，會跌落去商品清單嗰段，回一份完全唔相干嘅資料。
+    // 認住佢個樣（有 currentSheet／products、但冇商品名），直接講返要重新部署。
+    if (!data.name && (data.currentSheet !== undefined || Array.isArray(data.products))) {
+      resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ 你部 GAS 仲未識 ${cfg.label} 報價。<br>
+        <span style="font-size:11px;color:var(--muted);">Apps Script → 部署 → 管理部署 → ✏️ → 版本：新版本 → 部署（唔好用「新增部署」，會換咗網址）。</span></p>`;
+      return;
+    }
+    if (data.error) {
+      resultEl.innerHTML = `<p style="font-size:12px;color:#c62828;">❌ ${data.message || data.error}</p>`;
+      return;
+    }
 
     const rate       = region === 'hk' ? RATES.hk : RATES.tw;
     const currency   = region === 'hk' ? 'HK$' : 'NT$';

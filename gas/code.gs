@@ -537,6 +537,30 @@ function doGet(e) {
     return jsonpOrJson_(param, { result: "ok" });
   }
 
+  if (action === "getOrderSummaryAll") {
+    try {
+      return ContentService.createTextOutput(JSON.stringify({ events: getOrderSummaryAll(ss) }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    } catch (allErr) {
+      Logger.log("getOrderSummaryAll 錯誤: " + allErr);
+      return ContentService.createTextOutput(JSON.stringify({ error: allErr.toString(), events: [] }))
+                           .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 認唔到嘅指令要即刻講明，唔好靜靜跌落分流 4。
+  // 跌落去嘅話會慢慢掃勻成個訂單紀錄，再回傳一份商品清單 ——
+  // 呼叫方等到 timeout 都等唔到佢要嘅欄位，睇落就好似「一直查詢中」。
+  // 呢個情況通常代表 GAS 未重新部署，即係部署緊嘅版本仲未有呢個指令。
+  if (action && action !== "getItems") {
+    return jsonpOrJson_(param, {
+      result: "error",
+      error: "unknown_action",
+      action: action,
+      message: "呢個 GAS 版本未認得指令「" + action + "」。請喺 Apps Script 撳「部署 → 管理部署 → ✏️ → 版本：新版本 → 部署」，千祈唔好用「新增部署」（會換咗網址）。"
+    });
+  }
+
   // 🛒 【分流 4】下單前台：兼容 action=getItems、event=、sheetName= 三種方式
   var targetSheetName = param.event ? param.event : (param.sheetName ? param.sheetName : "");
   
@@ -3192,6 +3216,53 @@ function getOrderSummary(ss, eventName) {
     result.push({ name: pName, subs: productGroups[pName] });
   }
   return { items: result, batches: batches };
+}
+
+// =================================================================
+// getOrderSummaryAll：逐個活動計「要買幾多錢」同「買咗幾多錢」，
+// 俾後台「購貨總覽」一眼睇晒邊個團仲未買完。
+// =================================================================
+function getOrderSummaryAll(ss) {
+  var sysSheets = ["訂單紀錄", "易寄取地址", "Blank", "收單截止時間", "購貨紀錄", "盈利紀錄", "Nissen精選"];
+  var sheets = ss.getSheets();
+  var events = [];
+
+  for (var i = 0; i < sheets.length; i++) {
+    var sheetName = sheets[i].getName();
+    if (sheetName.startsWith("[Data]")) continue;
+    if (sysSheets.indexOf(sheetName) !== -1) continue;
+
+    var needYen = 0, boughtYen = 0, productCount = 0;
+    try {
+      var items = (getOrderSummary(ss, sheetName).items) || [];
+      productCount = items.length;
+      for (var it = 0; it < items.length; it++) {
+        var subs = items[it].subs || [];
+        for (var s = 0; s < subs.length; s++) {
+          var yenEach = subs[s].yenEach || 0;
+          needYen   += yenEach * (subs[s].paidQty   || 0);
+          boughtYen += yenEach * (subs[s].purchased || 0);
+        }
+      }
+    } catch (evErr) {
+      // 一個活動出事唔應該拖冧成張表，記低就算
+      Logger.log("getOrderSummaryAll 略過「" + sheetName + "」：" + evErr);
+      continue;
+    }
+
+    // 完全冇訂單嘅活動唔使佔行
+    if (productCount === 0) continue;
+
+    events.push({
+      name:         sheetName,
+      displayName:  stripEndPrefix(sheetName),
+      productCount: productCount,
+      needYen:      Math.round(needYen),
+      boughtYen:    Math.round(boughtYen)
+    });
+  }
+
+  return events;
 }
 
 // =================================================================
