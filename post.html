@@ -464,8 +464,8 @@ function buildCaption(list) {
       : `${shopTxt} 特價中 🔥 最低 ${local(cheapest.yen)} 就有`);
   } else {
     L.push(hk
-      ? `${shopTxt} 今期推介 🇯🇵 全部代購得`
-      : `${shopTxt} 本期推薦 🇯🇵 全部都能代購`);
+      ? `${shopTxt} 今期推介 🇯🇵`
+      : `${shopTxt} 本期推薦 🇯🇵`);
   }
   L.push('');
 
@@ -535,10 +535,14 @@ function buildTags(list) {
 // ── 出 post 卡：喺瀏覽器度畫一張 1080×1350，中文字用返本機字型 ──
 // 版式跟《商品卡版式規格》，改咗規格記住兩邊一齊改。
 const CARD_W = 1080, CARD_H = 1350, M = 80;
-const CARD = {
-  paper:'#F2EFE9', ink:'#1F1D1A', muted:'#8A857C',
-  rule:'#DDD8CE', seq:'#E0DBD1', hk:'#C0392B', tw:'#2980B9',
+
+// 每間鋪一套紙色。唔淨止換底 —— 細線、大編號、相框底都要一齊換色溫，
+// 唔係暖色線配冷色紙會好污糟。墨黑同重點色兩邊共用。
+const PAPER = {
+  nissen: { paper:'#F2EFE9', rule:'#DDD8CE', seq:'#E0DBD1', shot:'#E4E0D7', muted:'#8A857C' },
+  zozo:   { paper:'#E7E8E4', rule:'#D2D4CE', seq:'#D7D9D3', shot:'#DADCD6', muted:'#82857F' },
 };
+const CARD = { ink:'#1F1D1A', hk:'#C0392B', tw:'#2980B9' };
 
 let fontsReady = null;
 function loadCardFonts() {
@@ -605,24 +609,25 @@ async function drawCard(item, seq) {
   cv.width = CARD_W; cv.height = CARD_H;
   const ctx = cv.getContext('2d');
   const accent = region === 'hk' ? CARD.hk : CARD.tw;
+  const P = PAPER[item.key] || PAPER.nissen;
   const R = CARD_W - M;   // 右邊界
 
-  ctx.fillStyle = CARD.paper;
+  ctx.fillStyle = P.paper;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
   ctx.textBaseline = 'top';
 
   // 大隻淺色編號，擺最底層
-  ctx.fillStyle = CARD.seq;
+  ctx.fillStyle = P.seq;
   ctx.font = '200 104px "Noto Serif TC", serif';
   ctx.textAlign = 'right';
   ctx.fillText(String(seq).padStart(2, '0'), R, 74);
 
-  ctx.fillStyle = CARD.rule;
+  ctx.fillStyle = P.rule;
   ctx.fillRect(M, 96, CARD_W - M * 2, 1);
   ctx.fillRect(M, 1286, CARD_W - M * 2, 1);
 
   ctx.textAlign = 'left';
-  ctx.fillStyle = CARD.muted;
+  ctx.fillStyle = P.muted;
   ctx.font = '400 23px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '6.9px';                 // 23px 嘅 0.3em
   ctx.fillText('日本代購', M, 110);
@@ -632,17 +637,18 @@ async function drawCard(item, seq) {
     const im = await loadPic(item.image);
     drawCover(ctx, im, M, 180, 920, 820);
   } catch (e) {
-    ctx.fillStyle = '#E4E0D7';
+    ctx.fillStyle = P.shot;
     ctx.fillRect(M, 180, 920, 820);
   }
   ctx.letterSpacing = '0px';
-  ctx.strokeStyle = CARD.rule;
+  ctx.strokeStyle = P.rule;
   ctx.lineWidth = 1;
   ctx.strokeRect(M + .5, 180.5, 919, 819);
 
   // 品牌
-  const brand = (item.brand || SRC[item.key].label).toUpperCase();
-  ctx.fillStyle = CARD.muted;
+  // 一律出店舖名，唔出商品品牌 —— 成套卡睇落先至齊整
+  const brand = SRC[item.key].label;
+  ctx.fillStyle = P.muted;
   ctx.font = '400 23px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '5.98px';                // 0.26em
   ctx.fillText(brand, M, 1046);
@@ -663,7 +669,7 @@ async function drawCard(item, seq) {
     (item.yenMax && item.yenMax !== item.yen ? '起' : '');
   ctx.fillText(yenTxt, R, 1080);
 
-  ctx.fillStyle = CARD.muted;
+  ctx.fillStyle = P.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '1.76px';                // 0.08em
   ctx.fillText(region === 'hk' ? '港幣報價 → DM' : '台幣報價 → 私訊', R, 1180);
@@ -673,7 +679,7 @@ async function drawCard(item, seq) {
   ctx.fillRect(R - 96, 1152, 96, 2);
 
   // 頁腳
-  ctx.fillStyle = CARD.muted;
+  ctx.fillStyle = P.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '3.08px';                // 0.14em
   ctx.fillText('日本直送', R, 1302);
