@@ -2117,39 +2117,52 @@ function doPost(e) {
     // ── 出 post 草稿存入「出Post」分頁（俾 Make 讀去自動出文）──
     if (rowData.action === "savePostDraft") {
       try {
+        // 圖片除咗夾埋一格（F），仲逐張開一欄（L 之後）——
+        // Make 要砌 carousel 嘅話，逐欄 map 落每一格，
+        // 好過喺佢度將一格拆成 array，少一步易錯嘅嘢。
+        var PD_MAX_IMG = 10;
+        var pdHeader = [
+          "建立時間", "地區", "店舖", "件數", "商品名", "圖片網址（全部）",
+          "商品網址", "文案", "Hashtag", "狀態", "出咗嘅時間"
+        ];
+        for (var hi = 1; hi <= PD_MAX_IMG; hi++) pdHeader.push("圖片" + hi);
+
         var pdSheet = ss.getSheetByName("出Post");
         if (!pdSheet) {
           pdSheet = ss.insertSheet("出Post");
-          pdSheet.appendRow([
-            "建立時間", "地區", "店舖", "件數", "商品名", "圖片網址",
-            "商品網址", "文案", "Hashtag", "狀態", "出咗嘅時間"
-          ]);
+          pdSheet.appendRow(pdHeader);
           pdSheet.setFrozenRows(1);
-          pdSheet.getRange(1, 1, 1, 11).setFontWeight("bold");
+          pdSheet.getRange(1, 1, 1, pdHeader.length).setFontWeight("bold");
+        } else if (pdSheet.getLastColumn() < pdHeader.length) {
+          // 舊版得 11 欄，補返啲圖片欄個標題
+          pdSheet.getRange(1, 1, 1, pdHeader.length).setValues([pdHeader])
+                 .setFontWeight("bold");
         }
 
-        // Make 讀一行就夠砌一個 post：圖片同網址用換行分隔，佢自己 split
+        // Make 讀一行就夠砌一個 post
         var pdItems  = rowData.items || [];
-        var pdImages = pdItems.map(function(i){ return i.image || ""; })
-                              .filter(String).join("\n");
+        var pdPics   = pdItems.map(function(i){ return i.image || ""; }).filter(String);
         var pdUrls   = pdItems.map(function(i){ return i.url || ""; })
                               .filter(String).join("\n");
         var pdNames  = pdItems.map(function(i){ return i.name || ""; })
                               .filter(String).join("\n");
 
-        pdSheet.appendRow([
+        var pdRow = [
           new Date(),
           (rowData.region === 'tw') ? '🇹🇼 台灣' : '🇭🇰 香港',
           rowData.shops   || "",
           pdItems.length,
           pdNames,
-          pdImages,
+          pdPics.join("\n"),
           pdUrls,
           rowData.caption || "",
           rowData.tags    || "",
           "待出",
           ""
-        ]);
+        ];
+        for (var pi2 = 0; pi2 < PD_MAX_IMG; pi2++) pdRow.push(pdPics[pi2] || "");
+
+        pdSheet.appendRow(pdRow);
 
         return ContentService.createTextOutput(JSON.stringify({
           result: "ok", row: pdSheet.getLastRow(), count: pdItems.length
