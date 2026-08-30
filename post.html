@@ -104,6 +104,15 @@
         <button type="button" data-r="hk" class="on">🇭🇰 香港版</button>
         <button type="button" data-r="tw">🇹🇼 台灣版</button>
       </div>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;">
+        每個 post
+        <select id="perPost" style="font-family:inherit;font-size:13px;padding:8px 9px;
+                border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--ink);">
+          <option>2</option><option selected>3</option><option>4</option><option>5</option>
+          <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+        </select>
+        件
+      </label>
       <button class="go" id="goBtn" type="button">攞資料</button>
     </div>
     <div class="prog" id="prog"></div>
@@ -115,7 +124,8 @@
   </div>
 
   <div id="capPanel" class="panel hide">
-    <h2>文案 <span>撳張相可以開原圖，長撳就儲存到</span></h2>
+    <h2>文案 <span id="capHint">撳張相可以開原圖，長撳就儲存到</span></h2>
+    <div class="tools" id="postTabs" style="margin:0 0 11px"></div>
     <div class="out" id="caption"></div>
     <div class="tools">
       <button class="cp" type="button" data-copy="caption">複製文案</button>
@@ -165,6 +175,18 @@ const srcOf = (u) => Object.keys(SRC).find(k => SRC[k].re.test(u)) || null;
 
 let region = 'hk';
 let items = [];
+let curPost = 0;   // 預覽緊第幾個 post
+
+// IG carousel 要每個 post 張數一樣，Make 先至 map 得死 —— 所以夠一組就切一組，
+// 唔夠一組嘅尾數唔會存，留返喺頁面度等你揀多幾件。
+const perPost = () => parseInt($('perPost').value) || 3;
+function postGroups() {
+  const picked = items.filter(i => !i.error && i.pick);
+  const n = perPost();
+  const groups = [];
+  for (let i = 0; i + n <= picked.length; i += n) groups.push(picked.slice(i, i + n));
+  return { groups, left: picked.length % n, picked };
+}
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s)
@@ -180,6 +202,7 @@ document.querySelectorAll('#regSeg button').forEach(b => {
 });
 
 $('goBtn').addEventListener('click', run);
+$('perPost').addEventListener('change', () => { curPost = 0; if (items.length) render(); });
 
 async function run() {
   const urls = $('urls').value.split('\n').map(s => s.trim())
@@ -293,16 +316,52 @@ function render() {
     });
   });
 
-  const picked = ok.filter(i => i.pick);
-  if (picked.length) {
-    $('capPanel').classList.remove('hide');
-    $('tagPanel').classList.remove('hide');
-    $('caption').textContent = buildCaption(picked);
-    $('tags').textContent = buildTags(picked);
-  } else {
+  const { groups, left, picked } = postGroups();
+  const n = perPost();
+
+  if (!picked.length) {
     $('capPanel').classList.add('hide');
     $('tagPanel').classList.add('hide');
+    return;
   }
+
+  $('capPanel').classList.remove('hide');
+  $('tagPanel').classList.remove('hide');
+
+  if (!groups.length) {
+    // 揀嘅唔夠砌一個 post
+    $('postTabs').innerHTML = '';
+    $('caption').textContent =
+      `揀夠 ${n} 件先砌到一個 post，而家揀咗 ${picked.length} 件 —— 仲爭 ${n - picked.length} 件。`;
+    $('tags').textContent = buildTags(picked);
+    $('capHint').textContent = '';
+    $('saveBtn').disabled = true;
+    $('saveMsg').textContent = '';
+    return;
+  }
+
+  $('saveBtn').disabled = false;
+  if (curPost >= groups.length) curPost = 0;
+
+  $('postTabs').innerHTML = groups.length > 1
+    ? groups.map((g, i) =>
+        `<button class="cp${i === curPost ? ' done' : ''}" type="button" data-post="${i}">Post ${i + 1}</button>`
+      ).join('')
+    : '';
+  document.querySelectorAll('[data-post]').forEach(b => {
+    b.addEventListener('click', () => { curPost = +b.dataset.post; render(); });
+  });
+
+  $('capHint').textContent = groups.length > 1
+    ? `會存 ${groups.length} 個 post，每個 ${n} 件`
+    : `1 個 post，${n} 件`;
+
+  $('caption').textContent = buildCaption(groups[curPost]);
+  $('tags').textContent = buildTags(groups[curPost]);
+
+  $('saveMsg').innerHTML = left
+    ? `⚠️ 仲有 <b>${left}</b> 件唔夠砌多一個 post，唔會存 —— 揀多 ${n - left} 件就砌到。`
+    : '';
 }
 
 // ── 商品名 ────────────────────────────────────────────────
@@ -429,53 +488,66 @@ function buildTags(list) {
 
 // ── 存落 Google Sheet（俾 Make 讀去自動出 post）────────────
 $('saveBtn').addEventListener('click', async () => {
-  const picked = items.filter(i => !i.error && i.pick);
-  if (!picked.length) return;
+  const { groups, left } = postGroups();
+  if (!groups.length) return;
 
   const btn = $('saveBtn');
   btn.disabled = true;
-  $('saveMsg').textContent = '存緊…';
 
-  const payload = {
-    action: 'savePostDraft',
-    region,
-    shops: [...new Set(picked.map(i => SRC[i.key].label))].join(' + '),
-    caption: $('caption').textContent,
-    tags: $('tags').textContent,
-    items: picked.map(i => ({
-      name: shortName(i.name),
-      image: i.image,
-      url: i.url,
-      yen: i.yen,
-      local: Math.ceil(i.yen * rate()),
-      discount: i.discount || 0,
-    })),
-  };
+  const rows = [];
+  for (let g = 0; g < groups.length; g++) {
+    $('saveMsg').innerHTML = `存緊第 <b>${g + 1}</b> / ${groups.length} 個 post…`;
+    const grp = groups[g];
+    const payload = {
+      action: 'savePostDraft',
+      region,
+      shops: [...new Set(grp.map(i => SRC[i.key].label))].join(' + '),
+      caption: buildCaption(grp),
+      tags: buildTags(grp),
+      items: grp.map(i => ({
+        name: shortName(i.name),
+        image: i.image,
+        url: i.url,
+        yen: i.yen,
+        local: Math.ceil(i.yen * rate()),
+        discount: i.discount || 0,
+      })),
+    };
 
-  // text/plain 唔會觸發 preflight，所以讀得返 GAS 嘅回覆，
-  // 唔使好似其他頁咁 no-cors 靠估佢成功咗。
-  try {
-    const res = await fetch(GAS_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-    });
-    const d = JSON.parse(await res.text());
-    if (d.result === 'ok') {
+    // text/plain 唔會觸發 preflight，所以讀得返 GAS 嘅回覆，
+    // 唔使好似其他頁咁 no-cors 靠估佢成功咗。
+    try {
+      const res = await fetch(GAS_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload),
+      });
+      const d = JSON.parse(await res.text());
+      if (d.result !== 'ok') {
+        $('saveMsg').innerHTML =
+          `❌ 第 ${g + 1} 個 post 存唔到：${esc(d.message || '未知原因')}` +
+          (rows.length ? `<br>之前 ${rows.length} 個已經存咗（第 ${rows.join('、')} 行）。` : '');
+        btn.disabled = false;
+        return;
+      }
+      rows.push(d.row);
+    } catch (e) {
+      // 讀唔到回覆多數係 GAS 未重新部署，或者瀏覽器擋咗
       $('saveMsg').innerHTML =
-        `✅ 已存入「出Post」分頁第 <b>${d.row}</b> 行（${d.count} 件），狀態「待出」。Make 可以讀得到喇。`;
-      btn.classList.add('done');
-      setTimeout(() => btn.classList.remove('done'), 2000);
-    } else {
-      $('saveMsg').textContent = '❌ ' + (d.message || '存唔到，請再試。');
+        `⚠️ 存第 ${g + 1} 個 post 嗰陣收唔到 GAS 回覆，未確定存唔存到。<br>` +
+        '<span style="color:var(--muted)">多數係 GAS 未重新部署（管理部署 → 新版本）。' +
+        '請去 Google Sheet 睇下「出Post」分頁有冇新行，唔好即刻再撳，會存多次。</span>';
+      btn.disabled = false;
+      return;
     }
-  } catch (e) {
-    // 讀唔到回覆多數係 GAS 未重新部署，或者瀏覽器擋咗
-    $('saveMsg').innerHTML =
-      '⚠️ 收唔到 GAS 回覆，未確定存唔存到。<br>' +
-      '<span style="color:var(--muted)">多數係 GAS 未重新部署（管理部署 → 新版本）。' +
-      '請去 Google Sheet 睇下「出Post」分頁有冇新行。</span>';
   }
+
+  $('saveMsg').innerHTML =
+    `✅ 已存 <b>${rows.length}</b> 個 post 落「出Post」分頁（第 ${rows.join('、')} 行），` +
+    `每個 ${perPost()} 件，狀態「待出」。` +
+    (left ? `<br>⚠️ 仲有 ${left} 件唔夠一個 post，冇存。` : '');
+  btn.classList.add('done');
+  setTimeout(() => btn.classList.remove('done'), 2000);
   btn.disabled = false;
 });
 
