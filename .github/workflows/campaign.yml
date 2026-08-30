@@ -5,10 +5,13 @@ name: 📸 今期推介（出 post 素材）
 #
 # 想即刻抓：Actions 分頁 → 揀「📸 今期推介」→ Run workflow
 
+# 每週自動跑嘅安排收咗皮：ZOZO 個 bot 防護擋死，Nissen 啲貨架版
+# 又係前端整個渲染出嚟，爬到嘅嘢唔夠出一個 post。
+# 而家出 post 用 /post 嗰版（貼商品網址，行 GAS 嗰條攞得到嘢嘅路）。
+# 呢個仍然 run 得，想試就手動 Run workflow；試得返就解返下面個 cron。
 on:
-  schedule:
-    # 每逢星期一 香港時間 09:00（UTC 01:00）
-    - cron: '0 1 * * 1'
+  # schedule:
+  #   - cron: '0 1 * * 1'   # 每逢星期一 香港時間 09:00
   workflow_dispatch:
     inputs:
       site:

@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出 post 助手 — 852hk.81jp</title>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f7f6f3; --card:#fff; --ink:#1a1a1a; --muted:#888; --border:#e8e6e1;
+    --hk:#c0392b; --tw:#2980b9; --general:#6d597a; --ok:#2e7d32; --okbg:#e8f5e9;
+  }
+  body{font-family:'Noto Sans HK',sans-serif;background:var(--bg);color:var(--ink);
+       -webkit-font-smoothing:antialiased;padding-bottom:60px}
+
+  .topbar{position:sticky;top:0;z-index:50;background:rgba(247,246,243,.94);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--border);height:56px;
+    display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+  .brand{font-family:'Shippori Mincho',serif;font-size:17px;font-weight:600;
+    letter-spacing:3px;color:var(--ink);text-decoration:none}
+  .back{font-size:12px;color:var(--muted);text-decoration:none}
+  .back:hover{color:var(--ink)}
+
+  .wrap{max-width:760px;margin:0 auto;padding:24px 20px}
+  h1{font-family:'Shippori Mincho',serif;font-size:22px;font-weight:600;margin-bottom:6px}
+  .lede{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:22px}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:18px;margin-bottom:18px}
+  label.fl{display:block;font-size:12px;font-weight:500;margin-bottom:7px}
+  textarea{width:100%;min-height:110px;border:1px solid var(--border);border-radius:8px;
+    padding:11px 12px;font-family:inherit;font-size:13px;line-height:1.7;resize:vertical;
+    background:var(--bg);color:var(--ink)}
+  textarea:focus{outline:2px solid var(--general);outline-offset:1px;background:var(--card)}
+
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .seg button{border:none;background:var(--card);padding:9px 16px;font-family:inherit;
+    font-size:13px;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:var(--ink);color:#fff}
+  .seg button:focus-visible{outline:2px solid var(--general);outline-offset:-2px}
+
+  .go{border:none;background:var(--ink);color:#fff;padding:11px 22px;border-radius:8px;
+    font-family:inherit;font-size:14px;font-weight:500;cursor:pointer;margin-left:auto}
+  .go:disabled{opacity:.45;cursor:default}
+
+  .prog{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.8}
+  .prog b{color:var(--ink);font-weight:500}
+
+  .cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+  .pc{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .pc.off{opacity:.4}
+  .pc .pick{position:absolute;left:9px;top:9px;z-index:2;width:22px;height:22px;cursor:pointer}
+  .pc a.im{display:block;aspect-ratio:1;background:var(--bg)}
+  .pc a.im img{width:100%;height:100%;object-fit:cover;display:block}
+  .pc .bd{padding:11px 12px 13px;display:flex;flex-direction:column;gap:4px;flex:1}
+  .pc .br{font-size:10px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+  .pc .nm{font-size:12.5px;line-height:1.5;font-weight:500;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pc .pr{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+  .pc .pr s{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
+  .pc .lo{font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+  .pc .off-tag{position:absolute;right:9px;top:9px;background:var(--hk);color:#fff;
+    font-size:10px;font-weight:700;padding:3px 6px;border-radius:4px}
+  .pc .st{font-size:10.5px;color:var(--muted);line-height:1.6}
+  .pc .err{padding:14px;font-size:12px;color:var(--hk);line-height:1.7}
+
+  .out{white-space:pre-wrap;font-size:13px;line-height:1.85;background:var(--bg);
+    border:1px solid var(--border);border-radius:8px;padding:14px;
+    font-family:inherit;word-break:break-word}
+  .tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .cp{border:1px solid var(--border);background:var(--card);color:var(--ink);
+    padding:8px 14px;border-radius:7px;font-family:inherit;font-size:12.5px;cursor:pointer}
+  .cp:hover{border-color:var(--ink)}
+  .cp.done{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
+
+  h2{font-size:14px;font-weight:700;margin-bottom:11px;display:flex;align-items:baseline;gap:9px}
+  h2 span{font-size:11px;font-weight:400;color:var(--muted)}
+  .hide{display:none}
+  a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--general);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a class="brand" href="/">852hk.81jp</a>
+  <a class="back" href="/">← 返首頁</a>
+</div>
+
+<div class="wrap">
+  <h1>出 post 助手</h1>
+  <p class="lede">
+    貼低 Nissen 或者 ZOZOTOWN 嘅<strong>商品網址</strong>（一行一條），
+    幫你攞返商品相、譯好嘅名同埋計好嘅價錢，再寫埋文案同 hashtag。
+  </p>
+
+  <div class="panel">
+    <label class="fl" for="urls">商品網址（一行一條，最多 10 條）</label>
+    <textarea id="urls" placeholder="https://www.nissen.co.jp/item/...&#10;https://zozo.jp/shop/.../"></textarea>
+    <div class="row">
+      <div class="seg" id="regSeg">
+        <button type="button" data-r="hk" class="on">🇭🇰 香港版</button>
+        <button type="button" data-r="tw">🇹🇼 台灣版</button>
+      </div>
+      <button class="go" id="goBtn" type="button">攞資料</button>
+    </div>
+    <div class="prog" id="prog"></div>
+  </div>
+
+  <div id="cardsPanel" class="panel hide">
+    <h2>商品 <span id="pickCount"></span></h2>
+    <div class="cards" id="cards"></div>
+  </div>
+
+  <div id="capPanel" class="panel hide">
+    <h2>文案 <span>撳張相可以開原圖，長撳就儲存到</span></h2>
+    <div class="out" id="caption"></div>
+    <div class="tools">
+      <button class="cp" type="button" data-copy="caption">複製文案</button>
+      <button class="cp" type="button" data-copy="tags">複製 hashtag</button>
+      <button class="cp" type="button" data-copy="both">連 hashtag 一齊複製</button>
+    </div>
+  </div>
+
+  <div id="tagPanel" class="panel hide">
+    <h2>Hashtag</h2>
+    <div class="out" id="tags"></div>
+  </div>
+</div>
+
+<script>
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
+const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
+
+// 匯率同運費跟返 admin 嗰版設定，唔好喺呢度另外寫死一份
+const CFG = { hk: 0.057, tw: 0.24, shipHk: 4.5, shipTw: 20 };
+(async () => {
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/app_settings?select=key,value',
+      { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
+    if (!r.ok) return;
+    for (const row of await r.json()) {
+      const v = parseFloat(row.value);
+      if (!(v > 0)) continue;
+      if (row.key === 'rate_hk')     CFG.hk = v;
+      if (row.key === 'rate_tw')     CFG.tw = v;
+      if (row.key === 'ship_hk_50g') CFG.shipHk = v;
+      if (row.key === 'ship_tw_50g') CFG.shipTw = v;
+    }
+    if (items.length) render();
+  } catch (e) {}
+})();
+
+const SRC = {
+  nissen: { label: 'NISSEN',   action: 'getNissenProduct', re: /nissen\.co\.jp/i },
+  zozo:   { label: 'ZOZOTOWN', action: 'getZozoProduct',   re: /zozo\.jp/i },
+};
+const srcOf = (u) => Object.keys(SRC).find(k => SRC[k].re.test(u)) || null;
+
+let region = 'hk';
+let items = [];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+
+document.querySelectorAll('#regSeg button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#regSeg button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    region = b.dataset.r;
+    if (items.length) render();
+  });
+});
+
+$('goBtn').addEventListener('click', run);
+
+async function run() {
+  const urls = $('urls').value.split('\n').map(s => s.trim())
+    .filter(Boolean).slice(0, 10);
+  if (!urls.length) { $('prog').textContent = '請先貼低商品網址。'; return; }
+
+  const bad = urls.filter(u => !srcOf(u));
+  if (bad.length) {
+    $('prog').innerHTML = '❌ 呢啲唔係 Nissen ／ ZOZOTOWN 嘅網址：<br>' +
+      bad.map(u => '　' + esc(u)).join('<br>');
+    return;
+  }
+
+  $('goBtn').disabled = true;
+  items = [];
+  $('cardsPanel').classList.add('hide');
+  $('capPanel').classList.add('hide');
+  $('tagPanel').classList.add('hide');
+
+  // 逐條攞。GAS 一次得一個請求，同時發會塞住。
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    const key = srcOf(url);
+    $('prog').innerHTML = `攞緊第 <b>${i + 1}</b> / ${urls.length} 件 —— ${SRC[key].label}…`;
+    items.push(await fetchOne(url, key));
+    render();
+  }
+
+  $('prog').innerHTML = `✅ 攞晒 <b>${items.filter(i => !i.error).length}</b> / ${urls.length} 件。` +
+    (items.some(i => i.error) ? ' 有幾件攞唔到，睇下面。' : '');
+  $('goBtn').disabled = false;
+}
+
+async function fetchOne(url, key) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 45000);
+  try {
+    const res = await fetch(
+      `${GAS_API_URL}?action=${SRC[key].action}&url=${encodeURIComponent(url)}`,
+      { signal: ctrl.signal });
+    const text = await res.text();
+    let d;
+    try { d = JSON.parse(text); }
+    catch (e) { return { url, key, error: '伺服器回覆咗非預期內容，多數係 GAS 未重新部署。' }; }
+
+    // 舊版 GAS 唔識呢個指令時，會跌落去商品清單嗰段，回一份唔相干嘅嘢
+    if (!d.name && (d.currentSheet !== undefined || Array.isArray(d.products))) {
+      return { url, key, error: '你部 GAS 仲未識呢個指令，要喺 Apps Script 重新部署（管理部署 → 新版本）。' };
+    }
+    if (d.error) return { url, key, error: d.message || d.error };
+    if (!d.name && !d.price) return { url, key, error: '攞唔到商品資料，請確認網址。' };
+
+    return {
+      url, key,
+      name: d.name || '',
+      image: d.image || '',
+      yen: d.price || 0,
+      yenMax: d.priceMax || 0,
+      origYen: d.origPrice || 0,
+      discount: d.discountRate || 0,
+      brand: d.brand || '',
+      shop: d.shop || '',
+      variants: d.variants || [],
+      pick: true,
+    };
+  } catch (e) {
+    return { url, key, error: e.name === 'AbortError' ? '等咗 45 秒都冇回覆，請再試一次。' : e.message };
+  } finally { clearTimeout(timer); }
+}
+
+const rate = () => region === 'hk' ? CFG.hk : CFG.tw;
+const cur  = () => region === 'hk' ? 'HK$' : 'NT$';
+const local = (yen) => cur() + Math.ceil(yen * rate()).toLocaleString();
+
+function render() {
+  const ok = items.filter(i => !i.error);
+  $('cardsPanel').classList.remove('hide');
+  $('pickCount').textContent = ok.length
+    ? `已揀 ${ok.filter(i => i.pick).length} / ${ok.length} 件` : '';
+
+  $('cards').innerHTML = items.map((it, n) => {
+    if (it.error) {
+      return `<div class="pc"><div class="err">❌ ${esc(it.error)}<br>
+        <span style="color:var(--muted);word-break:break-all;">${esc(it.url)}</span></div></div>`;
+    }
+    const inStock = (it.variants || []).flatMap(v => (v.sizes || v.subs || []))
+      .filter(s => s && s.inStock).length;
+    return `
+      <div class="pc${it.pick ? '' : ' off'}">
+        <input class="pick" type="checkbox" data-n="${n}" ${it.pick ? 'checked' : ''}
+               aria-label="揀呢件出 post">
+        ${it.discount ? `<span class="off-tag">${it.discount}%OFF</span>` : ''}
+        <a class="im" href="${esc(it.image)}" target="_blank" rel="noopener">
+          ${it.image ? `<img src="${esc(it.image)}" alt="" loading="lazy">` : ''}
+        </a>
+        <div class="bd">
+          ${it.brand || it.shop ? `<p class="br">${esc([it.brand, it.shop].filter(Boolean).join(' · '))}</p>` : ''}
+          <p class="nm">${esc(it.name)}</p>
+          <p class="pr">¥${it.yen.toLocaleString()}${it.yenMax && it.yenMax !== it.yen ? '〜' + it.yenMax.toLocaleString() : ''}
+            ${it.origYen && it.origYen > it.yen ? `<s>¥${it.origYen.toLocaleString()}</s>` : ''}</p>
+          <p class="lo" style="color:var(--${region})">${local(it.yen)}${it.yenMax && it.yenMax !== it.yen ? '起' : ''}</p>
+          ${inStock ? `<p class="st">${inStock} 個尺碼／顏色有貨</p>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.pick').forEach(cb => {
+    cb.addEventListener('change', () => {
+      items[+cb.dataset.n].pick = cb.checked;
+      render();
+    });
+  });
+
+  const picked = ok.filter(i => i.pick);
+  if (picked.length) {
+    $('capPanel').classList.remove('hide');
+    $('tagPanel').classList.remove('hide');
+    $('caption').textContent = buildCaption(picked);
+    $('tags').textContent = buildTags(picked);
+  } else {
+    $('capPanel').classList.add('hide');
+    $('tagPanel').classList.add('hide');
+  }
+}
+
+// ── 文案 ──────────────────────────────────────────────────
+// 由真實商品資料砌出嚟：有折扣就行減價路線，冇就行推介路線。
+function buildCaption(list) {
+  const hk = region === 'hk';
+  const shops = [...new Set(list.map(i => SRC[i.key].label))];
+  const shopTxt = shops.join(' ＋ ');
+  const best = list.reduce((a, b) => (b.discount || 0) > (a.discount || 0) ? b : a, list[0]);
+  const onSale = list.filter(i => i.discount > 0);
+  const cheapest = list.reduce((a, b) => b.yen < a.yen ? b : a, list[0]);
+
+  const L = [];
+
+  // 開場
+  if (onSale.length) {
+    L.push(hk
+      ? `${shopTxt} 減緊 🔥 最平嗰件 ${local(cheapest.yen)} 就有`
+      : `${shopTxt} 特價中 🔥 最低 ${local(cheapest.yen)} 就有`);
+  } else {
+    L.push(hk
+      ? `${shopTxt} 今期推介 🇯🇵 全部代購得`
+      : `${shopTxt} 本期推薦 🇯🇵 全部都能代購`);
+  }
+  L.push('');
+
+  // 逐件貨
+  list.slice(0, 6).forEach((it, n) => {
+    const nm = it.name.length > 34 ? it.name.slice(0, 33) + '…' : it.name;
+    // ZOZO 好多商品名已經帶住品牌，唔好再前置多次
+    const showBrand = it.brand &&
+      !nm.toLowerCase().includes(it.brand.toLowerCase());
+    const bits = [`${n + 1}. ${showBrand ? it.brand + ' ' : ''}${nm}`];
+    let price = `　　${local(it.yen)}`;
+    if (it.yenMax && it.yenMax !== it.yen) price += '起';
+    if (it.discount) price += hk ? `（減緊 ${it.discount}%）` : `（${it.discount}% OFF）`;
+    bits.push(price);
+    L.push(bits.join('\n'));
+  });
+  if (list.length > 6) {
+    L.push(hk ? `⋯⋯仲有 ${list.length - 6} 件，DM 問我攞` : `⋯⋯還有 ${list.length - 6} 件，私訊我索取`);
+  }
+  L.push('');
+
+  // 服務賣點
+  if (hk) {
+    L.push('⚖️ 國際運費只計實重，冇體積重 — 買衫最抵');
+    L.push(`📦 到港運費 HK$${CFG.shipHk}／50g`);
+    L.push('🚚 每兩星期由日本寄出，順豐到付／郵局易寄取／平郵任揀');
+    L.push('');
+    L.push('💬 想落單或者想問其他商品：');
+    L.push('　① DM 我哋，貼低商品網址，即刻同你計');
+    L.push('　② 上官網自己貼，秒出報價 — 連顏色尺碼、仲有冇貨都睇到');
+    L.push('');
+    L.push('🔗 jpshopper-852hk81jp.vercel.app');
+    L.push('');
+    L.push(onSale.length
+      ? `${best.discount ? `減 ${best.discount}% ` : ''}唔知幾時完，見到心水唔好等 — 斷咗碼真係冇㗎喇 🥲`
+      : '睇中直接落單，唔使等 ☺️');
+  } else {
+    L.push('⚖️ 國際運費只計實重，不算材積重 — 買衣服最划算');
+    L.push(`📦 到台運費 NT$${CFG.shipTw}／50g，另加賣貨便國內運費 NT$38`);
+    L.push('🚚 每月從日本寄出，到台後以賣貨便寄送');
+    L.push('');
+    L.push('💬 想下單或想問其他商品：');
+    L.push('　① 私訊我們，貼上商品連結，馬上幫你算');
+    L.push('　② 上官網自己貼，秒出報價 — 連顏色、尺寸、有沒有貨都看得到');
+    L.push('');
+    L.push('🔗 jpshopper-852hk81jp.vercel.app');
+    L.push('');
+    L.push(onSale.length
+      ? `${best.discount ? `${best.discount}% OFF ` : ''}不知道什麼時候結束，看到喜歡的別猶豫 — 斷碼就真的沒了 🥲`
+      : '看中直接下單，不用等回覆 ☺️');
+  }
+
+  return L.join('\n');
+}
+
+function buildTags(list) {
+  const hk = region === 'hk';
+  const shops = [...new Set(list.map(i => i.key))];
+  const t = ['#日本代購'];
+  // ZOZO 客要款，Nissen 客要實用平價，所以第二個 tag 唔同
+  if (shops.includes('zozo') && hk) t.push('#日系穿搭');
+  else t.push(hk ? '#香港代購' : '#台灣代購');
+  t.push(shops.includes('zozo') ? '#zozotown代購' : '#nissen代購');
+  return t.join(' ');
+}
+
+// ── 複製 ──────────────────────────────────────────────────
+document.querySelectorAll('.cp').forEach(b => {
+  b.addEventListener('click', async () => {
+    const what = b.dataset.copy;
+    const text = what === 'caption' ? $('caption').textContent
+               : what === 'tags'    ? $('tags').textContent
+               : $('caption').textContent + '\n\n' + $('tags').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      const was = b.textContent;
+      b.textContent = '✅ 複製咗';
+      b.classList.add('done');
+      setTimeout(() => { b.textContent = was; b.classList.remove('done'); }, 1600);
+    } catch (e) {
+      b.textContent = '複製唔到，請自己長撳揀字';
+    }
+  });
+});
+</script>
+</body>
+</html>
