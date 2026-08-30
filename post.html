@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>出 post 助手 — 852hk.81jp</title>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Noto+Sans+HK:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&family=Noto+Sans+HK:wght@300;400;500;700&family=Noto+Serif+TC:wght@200;500&family=Noto+Sans+TC:wght@400;500&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
@@ -140,6 +140,11 @@
   <div id="tagPanel" class="panel hide">
     <h2>Hashtag</h2>
     <div class="out" id="tags"></div>
+  </div>
+
+  <div id="cardPanel" class="panel hide">
+    <h2>出 post 卡 <span id="cardHint"></span></h2>
+    <div class="cards" id="cardOut"></div>
   </div>
 </div>
 
@@ -486,6 +491,186 @@ function buildTags(list) {
   return t.join(' ');
 }
 
+// ── 出 post 卡：喺瀏覽器度畫一張 1080×1350，中文字用返本機字型 ──
+// 版式跟《商品卡版式規格》，改咗規格記住兩邊一齊改。
+const CARD_W = 1080, CARD_H = 1350, M = 80;
+const CARD = {
+  paper:'#F2EFE9', ink:'#1F1D1A', muted:'#8A857C',
+  rule:'#DDD8CE', seq:'#E0DBD1', hk:'#C0392B', tw:'#2980B9',
+};
+
+let fontsReady = null;
+function loadCardFonts() {
+  if (fontsReady) return fontsReady;
+  fontsReady = Promise.all([
+    document.fonts.load('200 104px "Noto Serif TC"'),
+    document.fonts.load('500 54px "Noto Serif TC"'),
+    document.fonts.load('400 23px "Noto Sans TC"'),
+    document.fonts.load('500 56px "IBM Plex Mono"'),
+  ]).then(() => document.fonts.ready);
+  return fontsReady;
+}
+
+// 商品相由 GAS 代攞轉 data URI —— 直接載日本網站張相會整污糟塊 canvas
+const picCache = new Map();
+async function loadPic(url) {
+  if (picCache.has(url)) return picCache.get(url);
+  const p = (async () => {
+    const res = await fetch(`${GAS_API_URL}?action=proxyImage&url=${encodeURIComponent(url)}`);
+    const d = JSON.parse(await res.text());
+    if (!d.dataUri) throw new Error(d.message || d.error || '攞唔到商品相');
+    return await new Promise((ok, no) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = () => no(new Error('張相載入唔到'));
+      im.src = d.dataUri;
+    });
+  })();
+  picCache.set(url, p);
+  return p;
+}
+
+function drawCover(ctx, im, x, y, w, h) {
+  const s = Math.max(w / im.width, h / im.height);
+  const dw = im.width * s, dh = im.height * s;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  ctx.restore();
+}
+
+// 逐個字試落去，唔用 measureText 估 —— 中英數混排先至準
+function wrapText(ctx, text, maxW, maxLines) {
+  const lines = [];
+  let line = '';
+  for (const ch of String(text)) {
+    if (ctx.measureText(line + ch).width > maxW && line) {
+      lines.push(line);
+      if (lines.length === maxLines) return lines;
+      line = ch;
+    } else line += ch;
+  }
+  if (line) lines.push(line);
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    lines[maxLines - 1] = lines[maxLines - 1].slice(0, -1) + '…';
+  }
+  return lines;
+}
+
+async function drawCard(item, seq) {
+  await loadCardFonts();
+  const cv = document.createElement('canvas');
+  cv.width = CARD_W; cv.height = CARD_H;
+  const ctx = cv.getContext('2d');
+  const accent = region === 'hk' ? CARD.hk : CARD.tw;
+  const R = CARD_W - M;   // 右邊界
+
+  ctx.fillStyle = CARD.paper;
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.textBaseline = 'top';
+
+  // 大隻淺色編號，擺最底層
+  ctx.fillStyle = CARD.seq;
+  ctx.font = '200 104px "Noto Serif TC", serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(String(seq).padStart(2, '0'), R, 74);
+
+  ctx.fillStyle = CARD.rule;
+  ctx.fillRect(M, 96, CARD_W - M * 2, 1);
+  ctx.fillRect(M, 1286, CARD_W - M * 2, 1);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = CARD.muted;
+  ctx.font = '400 23px "Noto Sans TC", sans-serif';
+  ctx.letterSpacing = '6.9px';                 // 23px 嘅 0.3em
+  ctx.fillText('日本代購', M, 110);
+
+  // 商品相
+  try {
+    const im = await loadPic(item.image);
+    drawCover(ctx, im, M, 180, 920, 820);
+  } catch (e) {
+    ctx.fillStyle = '#E4E0D7';
+    ctx.fillRect(M, 180, 920, 820);
+  }
+  ctx.letterSpacing = '0px';
+  ctx.strokeStyle = CARD.rule;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(M + .5, 180.5, 919, 819);
+
+  // 品牌
+  const brand = (item.brand || SRC[item.key].label).toUpperCase();
+  ctx.fillStyle = CARD.muted;
+  ctx.font = '400 23px "Noto Sans TC", sans-serif';
+  ctx.letterSpacing = '5.98px';                // 0.26em
+  ctx.fillText(brand, M, 1046);
+  ctx.letterSpacing = '0px';
+
+  // 商品名，最多兩行
+  ctx.fillStyle = CARD.ink;
+  ctx.font = '500 54px "Noto Serif TC", serif';
+  wrapText(ctx, shortName(item.name), 600, 2)
+    .forEach((ln, i) => ctx.fillText(ln, M, 1086 + i * 68));
+
+  // 日圓價（唔出港幣／台幣 —— 匯率會變，張卡會留喺 feed 好耐）
+  ctx.textAlign = 'right';
+  ctx.fillStyle = accent;
+  ctx.font = '500 56px "IBM Plex Mono", monospace';
+  ctx.fillText('¥' + item.yen.toLocaleString(), R, 1080);
+
+  ctx.fillStyle = CARD.muted;
+  ctx.font = '400 22px "Noto Sans TC", sans-serif';
+  ctx.letterSpacing = '1.76px';                // 0.08em
+  ctx.fillText(region === 'hk' ? '港幣報價 → DM' : '台幣報價 → 私訊', R, 1180);
+  ctx.letterSpacing = '0px';
+
+  ctx.fillStyle = accent;
+  ctx.fillRect(R - 96, 1152, 96, 2);
+
+  // 頁腳
+  ctx.fillStyle = CARD.muted;
+  ctx.font = '400 22px "Noto Sans TC", sans-serif';
+  ctx.letterSpacing = '3.08px';                // 0.14em
+  ctx.fillText('日本直送', R, 1302);
+  ctx.textAlign = 'left';
+  ctx.fillText(region === 'hk' ? '852hk.81jp' : '886tw.81jp', M, 1302);
+  ctx.letterSpacing = '0px';
+
+  // IG 個 API 只收 JPEG
+  return await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.92));
+}
+
+// 整完即刻俾你睇，唔使等 IG 出咗先發現有嘢唔妥
+function showCards(urls, postNo) {
+  $('cardPanel').classList.remove('hide');
+  $('cardHint').textContent = `Post ${postNo}・已上載，Sheet 入面存嘅就係呢幾張`;
+  $('cardOut').innerHTML = urls.map((u, i) => `
+    <div class="pc">
+      <a class="im" href="${esc(u)}" target="_blank" rel="noopener"
+         style="aspect-ratio:4/5"><img src="${esc(u)}" alt="" loading="lazy"></a>
+      <div class="bd"><p class="st">第 ${i + 1} 張・1080×1350 JPG</p></div>
+    </div>`).join('');
+  $('cardPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── 上載去 Cloudinary（IG 讀唔到 Google Drive，要條公開網址）──
+const CLOUD_NAME = 'db7sjoxid';
+const CLOUD_PRESET = 'jpshopper_post';   // Cloudinary 要開一個同名嘅 unsigned preset
+async function uploadCard(blob, name) {
+  const fd = new FormData();
+  fd.append('file', blob, name);
+  fd.append('upload_preset', CLOUD_PRESET);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: fd });
+  const d = await res.json();
+  if (!d.secure_url) {
+    throw new Error(d.error && d.error.message
+      ? `Cloudinary：${d.error.message}` : 'Cloudinary 上載失敗');
+  }
+  return d.secure_url;
+}
+
 // ── 存落 Google Sheet（俾 Make 讀去自動出 post）────────────
 $('saveBtn').addEventListener('click', async () => {
   const { groups, left } = postGroups();
@@ -496,20 +681,41 @@ $('saveBtn').addEventListener('click', async () => {
 
   const rows = [];
   for (let g = 0; g < groups.length; g++) {
-    $('saveMsg').innerHTML = `存緊第 <b>${g + 1}</b> / ${groups.length} 個 post…`;
     const grp = groups[g];
+
+    // 先整卡再存，唔係 Sheet 入面會留低日本網站嘅原相
+    const cards = [];
+    for (let k = 0; k < grp.length; k++) {
+      $('saveMsg').innerHTML =
+        `第 <b>${g + 1}</b> / ${groups.length} 個 post — 整緊第 ${k + 1} / ${grp.length} 張卡…`;
+      try {
+        const blob = await drawCard(grp[k], k + 1);
+        cards.push(await uploadCard(blob, `post-${Date.now()}-${k + 1}.jpg`));
+      } catch (e) {
+        $('saveMsg').innerHTML =
+          `❌ 整卡／上載失敗：${esc(e.message)}` +
+          (/preset/i.test(e.message)
+            ? '<br><span style="color:var(--muted)">Cloudinary 要開一個叫 <code>jpshopper_post</code> 嘅 unsigned upload preset —— Settings → Upload → Add upload preset → Signing mode 揀 Unsigned。</span>'
+            : '') +
+          (rows.length ? `<br>之前 ${rows.length} 個 post 已經存咗。` : '');
+        btn.disabled = false;
+        return;
+      }
+    }
+    showCards(cards, g + 1);
+
+    $('saveMsg').innerHTML = `存緊第 <b>${g + 1}</b> / ${groups.length} 個 post…`;
     const payload = {
       action: 'savePostDraft',
       region,
       shops: [...new Set(grp.map(i => SRC[i.key].label))].join(' + '),
       caption: buildCaption(grp),
       tags: buildTags(grp),
-      items: grp.map(i => ({
+      items: grp.map((i, k) => ({
         name: shortName(i.name),
-        image: i.image,
+        image: cards[k],          // ← 出 post 卡，唔係原相
         url: i.url,
         yen: i.yen,
-        local: Math.ceil(i.yen * rate()),
         discount: i.discount || 0,
       })),
     };

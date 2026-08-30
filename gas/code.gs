@@ -347,6 +347,41 @@ function doGet(e) {
                          .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 代攞商品相。瀏覽器直接畫日本網站啲相落 canvas 會整污糟咗塊 canvas，
+  // 之後匯出唔到；由呢邊攞返轉做 data URI 就冇呢個問題。
+  if (action === "proxyImage") {
+    var imgUrl = param.url || '';
+    if (!imgUrl) {
+      return jsonpOrJson_(param, { error: '缺少圖片網址' });
+    }
+    try {
+      var imgResp = UrlFetchApp.fetch(imgUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/*,*/*;q=0.8',
+          'Referer': imgUrl
+        },
+        muteHttpExceptions: true,
+        followRedirects: true
+      });
+      if (imgResp.getResponseCode() !== 200) {
+        return jsonpOrJson_(param, { error: '攞唔到圖片 (HTTP ' + imgResp.getResponseCode() + ')' });
+      }
+      var imgBlob = imgResp.getBlob();
+      var imgBytes = imgBlob.getBytes();
+      // base64 之後大三分一，太大會爆 GAS 個回應上限
+      if (imgBytes.length > 4 * 1024 * 1024) {
+        return jsonpOrJson_(param, { error: '張相太大（' + Math.round(imgBytes.length / 1024) + 'KB）' });
+      }
+      var imgType = imgBlob.getContentType() || 'image/jpeg';
+      return jsonpOrJson_(param, {
+        dataUri: 'data:' + imgType + ';base64,' + Utilities.base64Encode(imgBytes)
+      });
+    } catch (imgErr) {
+      return jsonpOrJson_(param, { error: '攞圖片失敗：' + imgErr.toString() });
+    }
+  }
+
   if (action === "getZozoProduct") {
     var zozoResult = fetchZozoProduct_(param.url || '');
     return ContentService.createTextOutput(JSON.stringify(zozoResult))
