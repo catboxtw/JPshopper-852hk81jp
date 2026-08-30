@@ -129,13 +129,13 @@
 <div class="wrap">
   <h1>出 post 助手</h1>
   <p class="lede">
-    貼低<strong>商品網址</strong>（一行一條）—— Nissen、ZOZOTOWN、日本雜貨都得。
+    貼低<strong>商品網址</strong>（一行一條）—— Nissen、ZOZOTOWN、日本雜貨、台灣現貨都得。
     幫你攞返商品相、譯好嘅名同埋計好嘅價錢，再寫埋文案同 hashtag。
   </p>
 
   <div class="panel">
     <label class="fl" for="urls">商品網址（一行一條，最多 10 條）</label>
-    <textarea id="urls" placeholder="https://www.nissen.co.jp/item/...&#10;https://zozo.jp/shop/.../&#10;https://www.netsea.jp/shop/..."></textarea>
+    <textarea id="urls" placeholder="https://www.nissen.co.jp/item/...&#10;https://zozo.jp/shop/.../&#10;https://www.netsea.jp/shop/...&#10;https://www.khw1.com/products/..."></textarea>
     <div class="row">
       <div class="seg" id="regSeg">
         <button type="button" data-r="hk" class="on">🇭🇰 香港版</button>
@@ -243,9 +243,19 @@ const SRC = {
   // 呢個來源嘅名唔可以出街 —— 卡、文案、Sheet 一律用「日本雜貨」，
   // 而張卡上面嗰行改為出公仔名。
   netsea: { label: '日本雜貨', action: 'getNetseaProduct', re: /netsea\.jp/i },
+  // khw1.com 都係批發網，同 netsea 一樣唔想俾客人見到係邊度入嘅貨（唔係
+  // 佢哋自己都可以去批發網直接買，唔使搵我哋），所以都用個化名、唔出 QR。
+  khw1:   { label: '台灣現貨', action: 'getKhw1Product',   re: /khw1\.com/i },
 };
 const isNetsea = (it) => it && it.key === 'netsea';
+const isKhw1   = (it) => it && it.key === 'khw1';
+// 呢兩種嚟源嘅 price 已經係最終售價（台幣／算好嘅售價），唔使當日圓再乘匯率
+const isFlatPrice = (it) => isNetsea(it) || isKhw1(it);
 const srcOf = (u) => Object.keys(SRC).find(k => SRC[k].re.test(u)) || null;
+
+// khw1 GAS 直接回傳台幣售價，兩個地區都直接顯示呢個數（唔做匯率換算），
+// 淨係跟 region 換返個貨幣符號 —— 同 netsea 個 nsPriceTxt 同一套邏輯。
+const khw1PriceTxt = (it) => (region === 'hk' ? 'HK$' : 'NT$') + (it.yen || 0).toLocaleString();
 
 let region = 'hk';
 let items = [];
@@ -292,7 +302,7 @@ async function run() {
 
   const bad = urls.filter(u => !srcOf(u));
   if (bad.length) {
-    $('prog').innerHTML = '❌ 呢啲唔係 Nissen ／ ZOZOTOWN 嘅網址：<br>' +
+    $('prog').innerHTML = '❌ 呢啲唔識嘅網址：<br>' +
       bad.map(u => '　' + esc(u)).join('<br>');
     return;
   }
@@ -352,6 +362,7 @@ async function fetchOne(url, key) {
       character: d.character || '',      // 公仔名・台灣叫法
       characterHk: d.characterHk || '',  // 公仔名・香港叫法
       warn: d.warn || '',
+      note: d.note || '',   // khw1 預購到貨日說明
       variants: d.variants || [],
       pick: true,
     };
@@ -406,6 +417,10 @@ function render() {
               <span style="color:var(--muted);font-weight:400;">
                 ＝ ${(it.retailYen || 0).toLocaleString()} × 1.1 × ${factor()}</span></p>
             ${it.warn ? `<p class="st" style="color:var(--hk)">⚠️ ${esc(it.warn)}</p>` : ''}`
+          : isKhw1(it) ? `
+            <p class="lo" style="color:var(--${region})">${khw1PriceTxt(it)}</p>
+            ${it.note ? `<p class="st">ℹ️ ${esc(it.note)}</p>` : ''}
+            ${inStock ? `<p class="st">${inStock} 個款式有貨</p>` : ''}`
           : `
             <p class="pr">¥${it.yen.toLocaleString()}${it.yenMax && it.yenMax !== it.yen ? '〜' + it.yenMax.toLocaleString() : ''}
               ${it.origYen && it.origYen > it.yen ? `<s>¥${it.origYen.toLocaleString()}</s>` : ''}</p>
@@ -553,9 +568,11 @@ function buildCaption(list) {
   const shopTxt = shops.join(' ＋ ');
   const best = list.reduce((a, b) => (b.discount || 0) > (a.discount || 0) ? b : a, list[0]);
   const onSale = list.filter(i => i.discount > 0);
-  const priceOf = (i) => isNetsea(i) ? nsPrice(i) : i.yen;
+  const priceOf = (i) => isNetsea(i) ? nsPrice(i) : (i.yen || 0);
   const cheapest = list.reduce((a, b) => priceOf(b) < priceOf(a) ? b : a, list[0]);
-  const cheapTxt = isNetsea(cheapest) ? nsPriceTxt(cheapest) : local(cheapest.yen);
+  const cheapTxt = isNetsea(cheapest) ? nsPriceTxt(cheapest)
+    : isKhw1(cheapest) ? khw1PriceTxt(cheapest)
+    : local(cheapest.yen);
 
   const L = [];
 
@@ -583,8 +600,10 @@ function buildCaption(list) {
       ? (ch && !nm.includes(ch) ? ch + ' ' : '')
       : (showBrand ? it.brand + ' ' : '');
     const bits = [`${n + 1}. ${prefix}${nm}`];
-    let price = isNetsea(it) ? `　　${nsPriceTxt(it)}` : `　　¥${it.yen.toLocaleString()}`;
-    if (!isNetsea(it) && it.yenMax && it.yenMax !== it.yen) price += '起';
+    let price = isNetsea(it) ? `　　${nsPriceTxt(it)}`
+      : isKhw1(it) ? `　　${khw1PriceTxt(it)}`
+      : `　　¥${it.yen.toLocaleString()}`;
+    if (!isFlatPrice(it) && it.yenMax && it.yenMax !== it.yen) price += '起';
     if (it.discount) price += hk ? `（減緊 ${it.discount}%）` : `（${it.discount}% OFF）`;
     bits.push(price);
     L.push(bits.join('\n'));
@@ -595,7 +614,17 @@ function buildCaption(list) {
   L.push('');
 
   // 服務賣點
-  if (hk) {
+  // khw1（台灣現貨）唔係由日本寄嚟，唔可以照講「由日本寄出」嗰段 —— 淨係
+  // 呢個 post 全部都係 khw1（冇混其他嚟源）先套用呢個較短嘅版本。
+  const allKhw1 = list.every(isKhw1);
+  if (allKhw1) {
+    L.push(hk ? '📍台灣現貨，唔使等日本寄，落單後盡快幫你安排' : '📍台灣現貨，不用等日本寄，下單後盡快幫你安排');
+    L.push('');
+    L.push(hk ? '💬 想落單或者想問其他商品：' : '💬 想下單或想問其他商品：');
+    L.push(hk ? '　DM 我哋，話俾我知想要邊件就得' : '　私訊我們，告訴我們想要哪件就好');
+    L.push('');
+    L.push('🔗 jpshopper-852hk81jp.vercel.app');
+  } else if (hk) {
     L.push('⚖️ 國際運費只計實重，冇體積重 — 買衫最抵');
     L.push(`📦 到港運費 HK$${CFG.shipHk}／50g`);
     L.push('🚚 每兩星期由日本寄出，郵局易寄取運費只要HK$10-13！可以7仔/郵局/智郵站拎');
@@ -631,6 +660,12 @@ function buildCaption(list) {
 function buildTags(list) {
   const hk = region === 'hk';
   const shops = [...new Set(list.map(i => i.key))];
+
+  // khw1（台灣現貨）唔係日本代購，第一個 tag 唔可以照跟「#日本代購」
+  if (shops.includes('khw1')) {
+    return [hk ? '#香港代購' : '#台灣代購', '#台灣現貨', '#人氣好物'].join(' ');
+  }
+
   const t = ['#日本代購'];
 
   // 日本雜貨嗰批唔可以出個網站名，改為打公仔名 —— 搜嗰個名嘅人本身就係客
@@ -658,6 +693,7 @@ const PAPER = {
   nissen: { paper:'#F2EFE9', rule:'#DDD8CE', seq:'#E0DBD1', shot:'#E4E0D7', muted:'#8A857C' },
   zozo:   { paper:'#E7E8E4', rule:'#D2D4CE', seq:'#D7D9D3', shot:'#DADCD6', muted:'#82857F' },
   netsea: { paper:'#E4EDF3', rule:'#CBDAE4', seq:'#D2E0E9', shot:'#D6E3EB', muted:'#7C8992' },
+  khw1:   { paper:'#F2E4DD', rule:'#DFC9BC', seq:'#E8D5C9', shot:'#EAD8CD', muted:'#8C7568' },
 };
 const CARD = { ink:'#1F1D1A', hk:'#C0392B', tw:'#2980B9' };
 
@@ -819,12 +855,12 @@ async function drawCard(item, seq) {
     .forEach((ln, i) => ctx.fillText(ln, M, 1086 + i * 68));
 
   // Nissen／ZOZO 出日圓（匯率會變，張卡會留喺 feed 好耐，寫死本地價遲早唔啱）；
-  // 日本雜貨直接出售價，因為嗰個係算好嘅賣價，唔係即時匯率換算。
+  // 日本雜貨／khw1 直接出售價，因為嗰個已經係算好／最終嘅賣價。
   ctx.textAlign = 'right';
   ctx.fillStyle = accent;
   ctx.font = '500 56px "IBM Plex Mono", monospace';
-  const priceTxt = isNetsea(item)
-    ? nsPriceTxt(item)
+  const priceTxt = isNetsea(item) ? nsPriceTxt(item)
+    : isKhw1(item) ? khw1PriceTxt(item)
     : '¥' + item.yen.toLocaleString() +
       // 唔同碼唔同價嗰啲要寫「起」，唔係人哋照住最平嗰個價嚟問就麻煩
       (item.yenMax && item.yenMax !== item.yen ? '起' : '');
@@ -836,7 +872,7 @@ async function drawCard(item, seq) {
   ctx.fillStyle = P.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '1.76px';                // 0.08em
-  if (isNetsea(item)) {
+  if (isFlatPrice(item)) {
     // 冇 QR，所以 CTA 照舊擺喺價錢下面
     ctx.fillText(region === 'hk' ? 'DM 落單' : '私訊下單', R, 1180);
   } else {
@@ -846,8 +882,8 @@ async function drawCard(item, seq) {
   }
   ctx.letterSpacing = '0px';
 
-  // 商品網址嘅 QR。日本雜貨唔出 —— 唔可以引人去嗰個網站。
-  if (!isNetsea(item) && item.url) drawQr(ctx, item.url, R - QR_SIZE, 1174, QR_SIZE);
+  // 商品網址嘅 QR。日本雜貨／khw1 都唔出 —— 兩個都係批發網，唔可以引人直接去嗰度買。
+  if (!isFlatPrice(item) && item.url) drawQr(ctx, item.url, R - QR_SIZE, 1174, QR_SIZE);
 
   // 頁腳
   ctx.fillStyle = P.muted;
