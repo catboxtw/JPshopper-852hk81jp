@@ -277,7 +277,7 @@ document.querySelectorAll('#regSeg button').forEach(b => {
     document.querySelectorAll('#regSeg button').forEach(x => x.classList.remove('on'));
     b.classList.add('on');
     region = b.dataset.r;
-    if (items.length) render();
+    if (items.length) render();   // 冇手動改過嘅公仔名會跟住轉叫法
   });
 });
 
@@ -349,7 +349,8 @@ async function fetchOne(url, key) {
       brand: d.brand || '',
       shop: d.shop || '',
       retailYen: d.retailYen || 0,   // 上代，日本雜貨用嚟計售價
-      character: d.character || '',  // 認到嘅公仔名
+      character: d.character || '',      // 公仔名・台灣叫法
+      characterHk: d.characterHk || '',  // 公仔名・香港叫法
       warn: d.warn || '',
       variants: d.variants || [],
       pick: true,
@@ -452,11 +453,12 @@ function dispName(it) {
   return it.editName !== undefined ? it.editName : shortName(it.name);
 }
 
-// 張卡上面嗰行：日本雜貨出公仔名，其餘出店舖名
+// 張卡上面嗰行：日本雜貨出公仔名，其餘出店舖名。
+// 香港多數叫返英文名（Kuromi、Cinnamoroll），台灣用中文譯名，所以跟地區揀。
 function dispBrand(it) {
   if (it.editChar !== undefined) return it.editChar;
-  if (isNetsea(it)) return it.character || '';
-  return SRC[it.key].label;
+  if (!isNetsea(it)) return SRC[it.key].label;
+  return (region === 'hk' ? it.characterHk : it.character) || it.character || '';
 }
 
 function renderCaption() {

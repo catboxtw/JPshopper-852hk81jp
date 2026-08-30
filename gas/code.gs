@@ -847,43 +847,56 @@ function fetchZozoProduct_(url) {
 // 公仔名字典。出 post 唔會用日文原名，而 LanguageApp 譯人物名多數譯到唔知咩嚟，
 // 所以直接查表。長嘅要行先，唔係「マイメロ」會搶咗「マイメロディ」。
 var CHARACTERS_ = [
-  ['マイメロディ', '美樂蒂'], ['マイメロ', '美樂蒂'],
-  ['クロミ', '酷洛米'],
-  ['ハローキティ', 'Hello Kitty'], ['キティ', 'Hello Kitty'],
-  ['シナモロール', '大耳狗'], ['シナモン', '大耳狗'],
-  ['ポムポムプリン', '布丁狗'],
-  ['ぐでたま', '蛋黃哥'],
-  ['けろけろけろっぴ', '大眼蛙'], ['けろっぴ', '大眼蛙'],
-  ['リトルツインスターズ', '雙子星'], ['キキララ', '雙子星'], ['キキ&ララ', '雙子星'],
-  ['ハンギョドン', '人魚漢頓'],
-  ['バッドばつ丸', '酷企鵝'], ['ばつ丸', '酷企鵝'],
-  ['ポチャッコ', '帕恰狗'],
-  ['タキシードサム', '山姆企鵝'],
-  ['あひるのペックル', '貝克鴨'],
-  ['こぎみゅん', '小麥狗'],
-  ['ウィッシュミーメル', '許願兔'],
-  ['ちいかわ', '吉伊卡哇'], ['ハチワレ', '小八'], ['モモンガ', '鼯鼠'],
-  ['くりまんじゅう', '栗子饅頭'],
-  ['すみっコぐらし', '角落生物'],
-  ['コリラックマ', '小白熊'], ['キイロイトリ', '黃小鳥'], ['リラックマ', '拉拉熊'],
-  ['ミッフィー', '米飛兔'],
-  ['スヌーピー', '史努比'],
-  ['ムーミン', '嚕嚕米'],
-  ['ドラえもん', '哆啦A夢'],
-  ['ピカチュウ', '皮卡丘'], ['ポケモン', '寶可夢'],
-  ['パペットスンスン', '啾啾'],
-  ['くまのプーさん', '小熊維尼'], ['プーさん', '小熊維尼'],
-  ['スティッチ', '史迪奇'],
-  ['トトロ', '龍貓'],
-  ['サンリオ', '三麗鷗']
+  // [日文原名, 台灣叫法, 香港叫法]
+  // 香港多數直接叫英文名，台灣用中文譯名，所以兩邊分開存。
+  // 長嘅要行先，唔係「マイメロ」會搶咗「マイメロディ」。
+  ['マイメロディ', '美樂蒂', 'My Melody'], ['マイメロ', '美樂蒂', 'My Melody'],
+  ['クロミ', '酷洛米', 'Kuromi'],
+  ['ハローキティ', 'Hello Kitty', 'Hello Kitty'], ['キティ', 'Hello Kitty', 'Hello Kitty'],
+  ['シナモロール', '大耳狗', 'Cinnamoroll'], ['シナモン', '大耳狗', 'Cinnamoroll'],
+  ['ポムポムプリン', '布丁狗', 'Pompompurin'],
+  ['ぐでたま', '蛋黃哥', 'Gudetama'],
+  ['けろけろけろっぴ', '大眼蛙', 'Keroppi'], ['けろっぴ', '大眼蛙', 'Keroppi'],
+  ['リトルツインスターズ', '雙子星', 'Little Twin Stars'],
+  ['キキララ', '雙子星', 'Little Twin Stars'], ['キキ&ララ', '雙子星', 'Little Twin Stars'],
+  ['ハンギョドン', '人魚漢頓', 'Hangyodon'],
+  ['バッドばつ丸', '酷企鵝', 'Badtz-Maru'], ['ばつ丸', '酷企鵝', 'Badtz-Maru'],
+  ['ポチャッコ', '帕恰狗', 'Pochacco'],
+  ['タキシードサム', '山姆企鵝', 'Tuxedosam'],
+  ['あひるのペックル', '貝克鴨', 'Pekkle'],
+  ['こぎみゅん', '小麥狗', 'Kogimyun'],
+  ['ウィッシュミーメル', '許願兔', 'Wish me mell'],
+  ['ちいかわ', '吉伊卡哇', 'Chiikawa'],
+  ['ハチワレ', '小八', 'Hachiware'],
+  ['モモンガ', '鼯鼠', 'Momonga'],
+  ['くりまんじゅう', '栗子饅頭', 'Kurimanju'],
+  ['すみっコぐらし', '角落生物', 'Sumikko Gurashi'],
+  ['コリラックマ', '小白熊', 'Korilakkuma'],
+  ['キイロイトリ', '黃小鳥', 'Kiiroitori'],
+  ['リラックマ', '拉拉熊', 'Rilakkuma'],
+  ['ミッフィー', '米飛兔', 'Miffy'],
+  ['スヌーピー', '史努比', 'Snoopy'],
+  ['ムーミン', '嚕嚕米', 'Moomin'],
+  ['ドラえもん', '哆啦A夢', '多啦A夢'],
+  ['ピカチュウ', '皮卡丘', '比卡超'],
+  ['ポケモン', '寶可夢', 'Pokémon'],
+  ['パペットスンスン', '啾啾', 'SunSun'],
+  ['くまのプーさん', '小熊維尼', 'Winnie the Pooh'],
+  ['プーさん', '小熊維尼', 'Winnie the Pooh'],
+  ['スティッチ', '史迪奇', 'Stitch'],
+  ['トトロ', '龍貓', '龍貓'],
+  ['サンリオ', '三麗鷗', 'Sanrio']
 ];
 
+// 回台灣同香港兩個叫法，邊個地區出 post 就由前端揀
 function detectCharacter_(text) {
-  if (!text) return '';
+  if (!text) return null;
   for (var i = 0; i < CHARACTERS_.length; i++) {
-    if (text.indexOf(CHARACTERS_[i][0]) !== -1) return CHARACTERS_[i][1];
+    if (text.indexOf(CHARACTERS_[i][0]) !== -1) {
+      return { tw: CHARACTERS_[i][1], hk: CHARACTERS_[i][2] };
+    }
   }
-  return '';
+  return null;
 }
 
 // NETSEA 商品頁。出 post 只需要商品名、相、同埋「メーカー希望小売価格」——
@@ -918,8 +931,10 @@ function fetchNetseaProduct_(url) {
     var rp = html.match(/([0-9][0-9,]*)\s*<span[^>]*class=["']taxUnit["'][^>]*>\s*円\s*\/\s*点/);
     if (rp) result.retailYen = parseInt(rp[1].replace(/,/g, ''), 10);
 
-    // 公仔名由日文原名度認，譯完就搵唔返
-    result.character = detectCharacter_(result.name);
+    // 公仔名由日文原名度認 —— 譯完就搵唔返
+    var ch = detectCharacter_(result.name);
+    result.character   = ch ? ch.tw : '';
+    result.characterHk = ch ? ch.hk : '';
 
     if (!result.name) return { error: '攞唔到商品資料，請確認網址' };
     if (!result.retailYen) {
