@@ -396,8 +396,10 @@ function doGet(e) {
 
   if (action === "getKhw1Product") {
     var khw1Result = fetchKhw1Product_(param.url || '');
-    return ContentService.createTextOutput(JSON.stringify(khw1Result))
-                         .setMimeType(ContentService.MimeType.JSON);
+    // jsonpOrJson_ 兩用：post.html 直接 fetch() 攞返 plain JSON；
+    // admin.html 用 gasJsonp()（帶 callback 參數）就包成 JSONP，
+    // 唔使淨係為呢個 action 另開一條路。
+    return jsonpOrJson_(param, khw1Result);
   }
 
   if (action === "getNissenFeatured") {
