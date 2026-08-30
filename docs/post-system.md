@@ -1,321 +1,286 @@
-# 「貼網址 → 自動出 IG post」系統交接說明
+# 「貼商品網址 → 自動出 IG post」系統：整體運作說明
 
-呢份嘢寫俾第二個人（或者第二個 AI）睇，等佢可以照住起一套一模一樣嘅系統去對付第二啲網站。
-實作喺 `post.html`、`gas/code.gs`、`vendor/qrcode.js`。
+呢份嘢講**成套系統點樣運作**，唔綁死喺任何一個購物網站。
+睇完應該足夠由零起返一套，去對付你自己嗰啲網站。
+
+一句講晒：**你貼幾條商品網址入去，撳一下，佢自動出好三張品牌商品卡、
+寫好文案同 hashtag、上載好圖，然後排隊等自動出 post。**
 
 ---
 
 ## 一、整體係四舊嘢串埋
 
 ```
-瀏覽器頁面 (post.html，靜態，放喺 Vercel)
-    ↓ ①攞商品資料           ↓ ②攞商品相
-Google Apps Script (GAS) ←── 呢個係關鍵，係唯一去得到日本網站嘅一環
+瀏覽器頁面（一個靜態 HTML，放喺 Vercel／Netlify／GitHub Pages 都得）
+    ↓ ① 攞商品資料        ↓ ② 攞商品相
+Google Apps Script（GAS）←── 關鍵：呢個係唯一去得到目標網站嘅一環
     ↓
-瀏覽器用 canvas 畫出 1080×1350 商品卡
-    ↓ ③上載成品圖
-Cloudinary (unsigned upload preset)
-    ↓ ④寫一行
-Google Sheet「出Post」分頁
-    ↓ ⑤讀一行出一個 post
+瀏覽器用 <canvas> 畫出 1080×1350 商品卡
+    ↓ ③ 上載成品圖
+圖片寄存（Cloudinary，unsigned upload preset）
+    ↓ ④ 寫一行
+Google Sheet（一行 = 一個 post）
+    ↓ ⑤ 讀一行，出一個 post
 Make.com → Instagram for Business
 ```
 
-**冇伺服器、冇資料庫、冇 build step。** 全部係一個靜態 HTML ＋ 一個 GAS script。
+**冇伺服器、冇資料庫、冇 build step。**
+全部就係一個靜態 HTML ＋ 一個 Google Apps Script。成本近乎零。
 
 ---
 
-## 二、點解一定要 GAS 做中間人（最重要嗰點）
+## 二、五個步驟實際發生咩事
 
-瀏覽器**攞唔到**其他網站嘅 HTML —— CORS 擋死。所以：
+### ① 攞商品資料
 
-- **商品資料**：頁面 `fetch(GAS + '?action=getXxxProduct&url=...')`，GAS 用
-  `UrlFetchApp.fetch()` 攞返個 HTML，喺伺服器嗰邊 parse 完先回 JSON。
-- **商品相**：瀏覽器直接 `drawImage()` 一張跨網站嘅相落 canvas，塊 canvas 會「被污染」，
-  之後 `toBlob()` 會直接掟 exception，匯出唔到。所以要一個 `proxyImage` action ——
-  GAS 攞返張相轉成 `data:image/jpeg;base64,...` 回俾前端，data URI 唔會污染 canvas。
+用家喺頁面貼低商品網址（一行一條）。頁面逐條打去 GAS：
 
-GAS 仲有兩個附帶好處：
+```
+GET  https://script.google.com/macros/s/…/exec?action=getXxxProduct&url=<商品網址>
+```
 
-- **由 Google 個 IP 出去**，好多日本網站唔會擋
-  （同一個網站，喺 GitHub Actions 度用 Playwright 爬係被擋死嘅）
-- 內置 `LanguageApp.translate()` 免費做日→中翻譯
+GAS 攞返個 HTML，parse 完回一個**固定形狀**嘅 JSON：
 
-### GAS 嘅陷阱
-
-`doGet` 係一連串 `if (action === ...)`，全部唔中會**靜靜跌落最尾嘅預設分流**，
-回一份完全唔相干嘅嘢，呼叫方就會一直等到 timeout。
-**一定要喺最尾加個擋位**，認唔到指令就直接報 `unknown_action`：
-
-```javascript
-if (action && action !== "getItems") {
-  return jsonpOrJson_(param, {
-    result: "error", error: "unknown_action", action: action,
-    message: "呢個 GAS 版本未認得指令「" + action + "」，請重新部署。"
-  });
+```json
+{
+  "name":  "商品名（已譯做中文）",
+  "image": "商品相網址",
+  "price": 1550,
+  "variants": [ { "group": "顏色", "options": [ { "name": "M", "inStock": true } ] } ]
 }
 ```
 
-仲有：GAS 改完要人手 **部署 → 管理部署 → ✏️ → 版本：新版本 → 部署**。
-唔好撳「新增部署」—— 會換咗個 `/exec` 網址，所有呼叫方即刻死。
+**每個網站寫一個 function，全部回同一個形狀。** 前端唔使知邊個網站點抽資料。
+
+### ② 攞商品相
+
+再打多次 GAS，佢攞返張相轉成 `data:image/jpeg;base64,…` 回俾前端。
+（點解要咁做，見下面第三節。）
+
+### ③ 畫卡
+
+前端喺 `<canvas>` 度畫一張 1080×1350（IG 4:5）嘅商品卡：
+底色、商品相、商品名、價錢、QR code、你嘅 handle。
+畫完 `canvas.toBlob(…, 'image/jpeg')` 出圖。
+
+### ④ 上載 ＋ 存檔
+
+三張卡上載去圖片寄存攞返公開網址，再連同文案、hashtag 一齊寫一行入 Google Sheet，
+狀態標「待出」。
+
+### ⑤ 出 post
+
+Make 每隔一陣讀一行「待出」，出 IG carousel，出完將狀態改「已出」。
 
 ---
 
-## 三、加一個新網站，只需要寫一個 function
+## 三、點解一定要一個「中間人」（最重要嗰點）
 
-GAS 入面每個來源一個 function，全部回**同一個形狀**：
+**瀏覽器讀唔到其他網站嘅 HTML** —— CORS 擋死，冇得拗。
+所以一定要有一個喺伺服器嗰邊行嘅嘢幫你攞。我用 Google Apps Script，因為：
 
-```javascript
-function fetchXxxProduct_(url) {
-  if (!url || url.indexOf('xxx.com') === -1) return { error: '網址唔啱' };
-  var resp = UrlFetchApp.fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ' +
-                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'ja,en;q=0.5'
-    },
-    muteHttpExceptions: true, followRedirects: true
-  });
-  if (resp.getResponseCode() !== 200) return { error: 'HTTP ' + resp.getResponseCode() };
-  var html = resp.getContentText('UTF-8');
+- **免費、唔使養伺服器**、有一條固定嘅 `/exec` 網址
+- **由 Google 個 IP 出去**，好多網站唔會擋
+  （同一個網站，我用自己嘅爬蟲去爬係被 bot 防護擋死嘅，但 GAS 攞得到）
+- 內置免費翻譯（`LanguageApp.translate`）
+- 本身就住喺 Google Sheet 隔籬，寫資料入去零成本
 
-  var result = { name: '', image: null, price: null, variants: [], rawUrl: url };
-  // …由 html 度抽資料（見下面「抽資料嘅優先次序」）…
-  translateProductInPlace_(result);   // 日→中
-  return result;
-}
-```
+**仲有一個好易忽略嘅原因：商品相都要經佢。**
+如果你喺瀏覽器直接 `drawImage()` 一張跨網站嘅相落 canvas，
+塊 canvas 會被標記為「已污染」，之後 `toBlob()` 會直接掟 exception，**匯出唔到**。
+所以要由中間人攞返張相轉成 data URI —— data URI 唔會污染 canvas。
 
-### 抽資料嘅優先次序（由最穩到最唔穩）
+> 用第二樣嘢做中間人都得（Cloudflare Worker、Vercel Function、自己部 server），
+> 原理一樣：**一個幫你攞 HTML 同圖片、回 JSON 嘅代理。**
 
-1. **`<script id="__NEXT_DATA__">`** — Next.js 網站成個商品物件都喺入面。
-   唔好寫死 props 路徑（排行版同商品版路徑唔同），行勻棵 JSON tree 搵「似商品」嘅物件
-   （有名 + 有圖 + 有價）。
-2. **`<script type="application/ld+json">`** — JSON-LD `Product`，好多電商都有。
-3. **`og:title` / `og:image`** — 幾乎一定有，最穩陣嘅 fallback。
-4. **頁面入面嘅 JS 變數**，例如 `var itemName = "..."`
-   ⚠️ 呢啲係 JS 字面值，入面 `（` 呢類轉義**未解碼**，要自己解，
-   否則個名會出現成串 `（`：
+### 中間人嘅陷阱
 
-   ```javascript
-   function decodeJsString_(s) {
-     return String(s)
-       .replace(/\\u([0-9a-fA-F]{4})/g, function(_, h) {
-         return String.fromCharCode(parseInt(h, 16));
-       })
-       .replace(/\\(["'\/\\])/g, '$1').trim();
-   }
-   ```
-5. **DOM / regex 硬抽** — 最唔穩，網站改版就死。
-
-### 抽價錢嘅陷阱（全部真係踩過）
-
-- `<p>¥2,530<span>税込</span></p>` — 只睇葉節點會走漏，
-  要睇每個元素嘅**直屬文字節點**（`n.nodeType === 3`）
-- `¥1.980` — 有網站用**句點**做千位分隔，唔處理會變 ¥1
-- 同一版有兩個價（批發價／建議零售價）—— 要搵個獨有嘅標記分開佢哋。
-  例如日文批發站，零售價寫 `円/点（税抜）`、批發價寫 `円（税抜）`，靠 `円/点` 就分得出：
-
-  ```javascript
-  var rp = html.match(/([0-9][0-9,]*)\s*<span[^>]*class=["']taxUnit["'][^>]*>\s*円\s*\/\s*点/);
-  ```
+如果你好似 GAS 咁用一連串 `if (action === …)` 分流，
+**全部唔中嗰陣一定要報錯**，唔好靜靜地跌落最尾嘅預設分支。
+否則呼叫方會收到一份完全唔相干嘅資料，症狀係「好慢 ＋ 永遠載入中」，
+查半日先發現原來只係未部署新版本。
 
 ---
 
-## 四、出卡係用 canvas 喺瀏覽器度畫
+## 四、抽資料嘅優先次序
 
-**唔好用 Canva**（手動，斷咗自動化），
-**亦都唔好用 Cloudinary 文字疊加**（中文要另外上載字型，好易撞板）。
+同一個網站，用邊種方法抽差好遠。由最穩到最唔穩：
 
-```javascript
-const cv = document.createElement('canvas');
-cv.width = 1080; cv.height = 1350;      // IG 4:5，feed 佔最高位置
-const ctx = cv.getContext('2d');
-// 畫底色、線、圖、字…
-return await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.92));
-```
+1. **頁面內嵌嘅 JSON**（`<script id="__NEXT_DATA__">`、`self.__next_f` 等等）
+   現代網站成個商品物件都喺入面，仲齊過畫面顯示嗰啲。
+   ⚠️ 唔好寫死 JSON 路徑（列表版同商品版路徑唔同），
+   **行勻棵 tree 搵「似商品」嘅物件**（有名 + 有圖 + 有價）就最穩陣。
+2. **JSON-LD**（`<script type="application/ld+json">` 入面嘅 `Product`）
+3. **Open Graph meta**（`og:title` / `og:image`）—— 幾乎一定有，最好嘅 fallback
+4. **頁面內嘅 JS 變數**（`var itemName = "…"`）
+   ⚠️ 呢啲係 JS 字面值，`\uXXXX` 呢類轉義**未解碼**，要自己解，
+   唔係個名會出現成串亂碼
+5. **DOM／regex 硬抽** —— 最唔穩，網站改版就死
 
-幾個一定要知嘅位：
+### 抽價錢特別多陷阱
 
-- **字型要等佢載好先畫**，唔係會用咗 fallback 字：
+- 價錢俾標籤斬開：`<p>¥2,530<span>税込</span></p>`
+  只睇葉節點會走漏，要睇每個元素嘅**直屬文字節點**
+- 千位分隔符可能係**句點**（`1.980` = 1980），唔處理會變 1
+- 同一版有**幾個價**（原價／特價／批發價／建議零售價）
+  要搵個獨有嘅標記分開佢哋，唔好靠位置
+- 唔同尺碼唔同價 → 要出「起」字，唔係人哋照住最平嗰個價嚟問你就手尾長
 
-  ```javascript
-  await document.fonts.load('500 54px "Noto Serif TC"');
-  await document.fonts.ready;
-  ```
-- **中文由瀏覽器自己 render，100% 準**，冇缺字問題（AI 出圖同 Cloudinary 都做唔到）
+---
+
+## 五、點解用 canvas 畫卡
+
+試過三條路，得一條行得通：
+
+| 做法 | 結果 |
+|---|---|
+| AI 出圖 | 中文十次有七八次出錯，缺筆劃、錯別字 ❌ |
+| 圖片服務疊字（Cloudinary 之類） | 中文要另外上載字型，好易撞板 ❌ |
+| Canva 手動整 | 出到靚，但每個 post 要人手做，斷咗自動化 ❌ |
+| **瀏覽器 `<canvas>`** | **中文由瀏覽器自己 render，100% 準，而且全自動** ✅ |
+
+要注意：
+
+- **字型要等載好先畫**，唔係會用咗 fallback 字：
+  `await document.fonts.load('500 54px "字型名"'); await document.fonts.ready;`
 - **Instagram 個 API 只收 JPEG**，PNG 會被拒
-- `ctx.letterSpacing = '6px'` 現代 Chrome 支援，可以做字距
-- 圖片「填滿裁切」要自己計：
-  `scale = Math.max(w / img.width, h / img.height)`，再置中
-- 商品相要留返位俾兩行商品名 —— 相太高嘅話，第二行會壓住下面條線同頁腳
+- 圖片「填滿裁切」要自己計 `scale = Math.max(w/img.width, h/img.height)` 再置中
+- 文字要自己 wrap（逐個字試落去度闊度），同埋限定最多幾行
+- 留位要諗定：商品名可能一行都可能兩行，唔留位第二行會壓住下面啲嘢
 
 ### QR code
 
-用 `qrcode-generator`，直接攞 module 矩陣自己畫格仔落 canvas，唔經 DOM：
+用一個 QR library 攞返個 module 矩陣，自己畫格仔落 canvas，唔經 DOM。
+每格畫大 0.6px，避免縮放之後格與格之間見到白線。四邊一定要留白，唔留就掃唔到。
 
-```javascript
-const qr = qrcode(0, 'M');           // type 0 = 按長度自動揀版本
-qr.addData(url); qr.make();
-const n = qr.getModuleCount(), cell = size / n;
-ctx.fillStyle = '#FFF';
-ctx.fillRect(x - 8, y - 8, size + 16, size + 16);   // 四邊留白，唔留就掃唔到
-ctx.fillStyle = '#000';
-for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-  if (qr.isDark(r, c)) ctx.fillRect(x + c * cell, y + r * cell, cell + 0.6, cell + 0.6);
-}
-```
-
-`+0.6` 係避免縮放之後格與格之間見到白線。
-
-**呢個 library 要放喺自己個 repo，唔好用 CDN** —— CDN 一失敗就會靜靜咁出一批冇 QR 嘅卡。
-載唔到要直接掟錯，唔好靜靜地照出。
+**library 要放喺自己個 repo，唔好靠 CDN** ——
+CDN 一失敗就會靜靜咁出一批冇 QR 嘅卡。載唔到要直接報錯。
 
 ---
 
-## 五、上載同存檔
+## 六、上載同存檔
 
-### Cloudinary unsigned upload preset
+**圖片寄存**：Cloudinary 開一個 **unsigned upload preset**，
+前端就唔使放 API secret 落公開頁面。
 
-Settings → Upload → Add upload preset → Signing mode: **Unsigned**
-
-```javascript
-const fd = new FormData();
-fd.append('file', blob);
-fd.append('upload_preset', 'your_preset_name');
-const r = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`,
-                      { method: 'POST', body: fd });
-const url = (await r.json()).secure_url;
-```
-
-用 unsigned 就唔使將 API secret 放喺公開頁面。
-
-### 寫入 Google Sheet（GAS `doPost`）
-
-```javascript
-fetch(GAS_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // ← 關鍵
-  body: JSON.stringify(payload)
-});
-```
-
-用 `text/plain` 唔會觸發 CORS preflight，所以**讀得返 GAS 嘅回覆**。
+**寫 Google Sheet**：POST 去 GAS 嗰陣用 `Content-Type: text/plain;charset=utf-8`。
+咁樣唔會觸發 CORS preflight，所以**讀得返 GAS 嘅回覆**，知道有冇成功。
 用 `application/json` 就要 `mode:'no-cors'`，變成盲送，成功與否只能靠估。
 
-### Sheet 一行 = 一個 post
+**Sheet 設計成一行 = 一個 post**：
 
 ```
-A建立時間  B地區  C店舖  D件數  E商品名  F圖片網址(全部)
-G商品網址  H文案  I Hashtag  J狀態  K出咗時間  L-U圖片1…圖片10
+建立時間 │ 地區 │ 來源 │ 件數 │ 商品名 │ 商品網址 │ 文案 │ Hashtag │
+狀態 │ 出咗時間 │ 圖片1 │ 圖片2 │ 圖片3 │ …
 ```
 
-`圖片1/2/3` 逐張開一欄，唔係只擺一格用換行分隔 ——
-Make 逐欄 map 好過喺佢度將一格拆做 array，少一步易錯嘅嘢。
+`圖片1/2/3` **逐張開一欄**，唔好只擺一格用換行分隔 ——
+自動化工具逐欄 map 好過喺佢度將一格拆做 array，少一步易錯嘅嘢。
+
+`狀態` 同 `出咗時間` 兩欄係俾自動化工具寫返嘅，用嚟避免同一個 post 出兩次。
 
 ---
 
-## 六、Make 嗰邊（三個 module）
+## 七、自動出 post（Make 三個 module）
 
 ```
 ① Google Sheets · Search Rows
-   Filter: 狀態(J) = 待出 ／ Order by 建立時間(A) asc ／ Limit 1
+   Filter: 狀態 = 待出 ／ Order by 建立時間 asc ／ Limit 1
 
 ② Instagram for Business · Create a Carousel Post
    Photo 1/2/3 → 圖片1/2/3
    Caption → {{文案}} 空行 {{Hashtag}}
 
 ③ Google Sheets · Update a Cell ×2
-   J{{Row number}} = 已出
-   K{{Row number}} = {{formatDate(now; "YYYY-MM-DD HH:mm")}}
+   狀態 = 已出 ／ 出咗時間 = now
 ```
 
-踩過嘅坑：
+坑：
 
-- `now` 要用**變數**（紫色藥丸），打字打「now」入去會寫個英文字入格
-- Row number 要 map Search Rows 出嘅 `__ROW_NUMBER__`，唔可以填死數字
-- Carousel **最少 2 張最多 10 張**。你 map 咗幾多格就要**每次都揀夠幾多件**，
+- **Carousel 最少 2 張最多 10 張**，而且你 map 咗幾多格就要**每次都夠幾多張**，
   空 URL 會令成個 module 報錯
-- 所以前端要**強制分組**：揀 8 件 ÷ 每個 post 3 件 = 存 2 行，
-  剩低 2 件唔夠一組就唔存，並且話返用家知
-- 用 `Update a Cell` 好過 `Update a Row`，唔會有誤清其他欄嘅風險
-- 改 blueprint JSON 嗰陣，唔好改動 `restore.expect` 入面嘅 `mode`（`edit` vs `chose`）——
-  改錯會 run 到一半彈 `Value not found in options`
+- 所以**前端要強制分組**：揀 8 件 ÷ 每個 post 3 件 = 存 2 行，
+  剩低嗰 2 件唔夠一組就唔存，並且話返用家知仲爭幾多件
+- 更新狀態用 **Update a Cell** 好過 Update a Row，唔會誤清其他欄
+- 時間要用**變數**，唔好打「now」呢個字入去（會照字面寫個英文字入格）
+- 行號要 map 搜尋結果嗰個 row number，唔可以填死數字
 
 ---
 
-## 七、其他實戰經驗（每個都係踩完先知）
+## 八、幾個做完先知嘅道理
 
-**唔好爬列表頁。**
-試過爬「人氣排行」「特價」呢啲貨架版，結果：一個網站個 bot 防護令 `page.goto`
-等足 60 秒都唔返；另一個網站啲貨架係前端渲染，爬到得一件貨。
-**但單一商品頁一直攞得到。**
-所以改成由人揀貨貼網址，反而又快又穩。
+**唔好爬列表頁，叫人貼商品網址。**
+我原本想自動爬「熱門商品」「特價」呢啲版做素材。結果：一個網站個 bot 防護
+令頁面等足 60 秒都唔返；另一個網站啲貨架係前端渲染，爬到得一件貨。
+**但單一商品頁一直攞得到，冇失敗過。**
+改成由人揀貨貼網址，即刻又快又穩 —— 而且揀貨呢一步本身就應該有人把關。
 
-**批次翻譯要有 fallback。**
-將一件商品所有字串合併成一次 `LanguageApp.translate` 呼叫（快好多），
-但 Google 有時會併行或拆行，令行數對唔返。如果對唔返就整批唔套用，
-一件有幾十個尺碼顏色嘅衫就會**連商品名都唔譯**。
-要改成：對唔返就逐個譯，慢啲但唔會全軍覆沒。
-
-**日文商品名要斬短。**
-日文商品名成句堆賣點，例如「＜大尺碼＞5/8 袖印花束腰T卹（吸濕排汗，快乾）（輕薄布料）」。
-處理方法：
-
-- 括號成組拎走（唔好喺第一個括號度斬，會淨返「5」）
-- 只當 `｜` `・` 係分隔號（斜線唔算，「5/8 袖」係尺寸唔係兩個名）
-- 斬剩少過 4 個字就當斬錯，用返原名
-
-**最緊要係做成可以喺頁面手改** —— 自動化只係起點，唔係終點。
+**自動化只係起點，唔係終點。**
+自動抽出嚟嘅商品名一定唔啱用（日文商品名成句堆賣點，又長又雜）。
+所以每個欄位都要**做成可以喺頁面手改**，改完文案同張卡即刻跟住變。
+呢個係整套嘢最實用嘅一點。
 
 **唔好喺卡上面寫死匯率換算價。**
-張卡會留喺 feed 度成年，匯率會變，寫死遲早唔啱。只出原幣價，本地價叫人 DM ——
-順帶仲逼到人同你傾偈。
-（例外：如果嗰個係你自己算好嘅賣價而唔係即時匯率換算，就出得。）
+張卡會留喺 feed 度成年，匯率會變，寫死遲早唔啱，客人照住嚟問就尷尬。
+只出原幣價，本地價叫人 DM —— 順帶仲逼到人同你傾偈。
+（如果嗰個係你自己算好嘅賣價而唔係即時匯率換算，就出得。）
 
-**品牌／角色名重複。**
-商品名本身好多時已經帶住品牌或者角色名，前面再加一次就會變
-「Kuromi Kuromi 三摺銀包」。前置之前要 check `name.includes(brand)`。
+**留意名重複。**
+商品名本身好多時已經帶住品牌名，你喺前面再加一次就會變
+「XX牌 XX牌 三摺銀包」。前置之前要 check `name.includes(brand)`。
 
 **地區唔止係換貨幣。**
-香港叫 Kuromi、比卡超、多啦A夢；台灣叫酷洛米、皮卡丘、哆啦A夢。
-字典要一隻公仔存兩個叫法。
+同一件嘢，香港同台灣叫法可以完全唔同。要出兩個地區版就要諗埋用詞，
+唔係淨係換個貨幣符號。
 
 **前端密碼閘要小心 CSS 特異度。**
 `#lock { display:flex }` 會蓋過 `[hidden] { display:none }`，
-塊遮罩變咗透明但仍然擋住所有掣。要寫 `#lock[hidden]{display:none}`。
-另外要知：前端 PIN 擋得住路過嘅人，擋唔住肯睇 source code 嘅人。
+塊遮罩變咗透明但仍然擋住晒所有掣。
+另外要知：**前端密碼擋得住路過嘅人，擋唔住肯睇 source code 嘅人。**
 
 **每次改動都要用真嘢測。**
-全程用 Playwright 攔截 GAS／Cloudinary 嘅請求做假回覆，render 真張卡出嚟睇，
-仲用 `jsQR` 解碼驗返個 QR 真係掃到正確網址。
-九成 bug 係咁樣先揾到嘅 —— 淨係睇 code 睇唔出。
+我全程用 Playwright 攔截外部請求做假回覆，render 真張卡出嚟睇，
+仲用 QR 解碼器驗返個 QR 真係掃到正確網址。
+**九成 bug 係咁樣先揾到嘅** —— 淨係睇 code 睇唔出。
 
 ---
 
-## 八、要換去第二個網站，改呢幾樣
+## 九、要加一個新網站，改呢幾樣
 
 | 改邊度 | 改乜 |
 |---|---|
-| GAS | 加一個 `fetchXxxProduct_()`，回上面嗰個形狀；喺 `doGet` 加個 `if (action === 'getXxxProduct')` |
-| 前端 `SRC` 物件 | 加一行 `xxx: { label:'…', action:'getXxxProduct', re:/xxx\.com/i }` |
-| 前端 `PAPER` 物件 | 加一套底色（底、線、編號、相框底要一齊轉色溫，唔係暖色線配冷色紙會好污糟） |
-| `drawCard()` | 如果新來源要出唔同嘢（例如出角色名而唔係店名、出售價而唔係原幣價），加分支 |
-| 文案 `buildCaption()` | 運費、出貨頻率、CTA 呢啲照抄改字 |
+| 中間人（GAS） | 加一個抓取 function，回上面嗰個固定形狀；喺分流度加一個 action |
+| 前端來源清單 | 加一行：對外顯示名、action 名、認網址嘅 regex |
+| 前端配色表 | 加一套底色（底、線、編號、相框底要一齊轉色溫，暖色線配冷色紙會好污糟） |
+| 畫卡 function | 如果新來源要出唔同嘢（例如出角色名而唔係店名），加分支 |
+| 文案模板 | 運費、出貨頻率、CTA 呢啲改字 |
 
 **其餘全部唔使動。**
 
 ---
 
-## 九、有個來源唔可以出名（如果你都有呢個需要）
+## 十、如果有來源唔想出名
 
-其中一個來源係批發站，個名一個字都唔可以出街。做法：
+有時你唔想俾人知你去邊度入貨。做法：
 
-- 前端 `SRC` 個 `label` 直接寫成對外嘅代稱，成個系統只用嗰個 label
-- 卡上面嗰行改為出**角色名**而唔係店名
-- hashtag 用角色名，唔用店名
-- 存落 Sheet 嘅「店舖」欄都係代稱
+- 前端嘅來源 `label` 直接寫成對外嘅代稱，**成個系統只用嗰個 label**
+- 卡上面嗰行改為出第二樣嘢（例如角色名、系列名），唔出店名
+- hashtag 用嗰樣嘢，唔用店名
+- 連存落 Sheet 嗰欄都要用代稱
 
-寫完之後 grep 成個檔案確認一次，剩返嘅只應該係內部識別碼
-（物件 key、GAS action 名、網址判斷嘅 regex），嗰啲唔會出街。
+寫完 grep 成個檔案確認一次 —— 剩返嘅應該只有內部識別碼
+（物件 key、action 名、認網址嘅 regex），嗰啲唔會出街。
+
+---
+
+## 十一、開頭要準備嘅嘢
+
+1. **Google 帳戶** —— 開一個 Google Sheet，喺入面「擴充功能 → Apps Script」寫個 script，
+   部署做「網頁應用程式」，任何人都可以存取。攞返條 `/exec` 網址。
+   ⚠️ 之後每次改完 code 都要 **部署 → 管理部署 → ✏️ → 版本：新版本 → 部署**。
+   **千祈唔好撳「新增部署」**，會換咗條網址，所有嘢即刻死。
+2. **Cloudinary 免費戶口** —— 開一個 unsigned upload preset
+3. **Make.com 免費戶口** —— 駁 Google Sheets 同 Instagram for Business
+4. **IG 要係 Business／Creator 帳戶**，而且要連咗一個 Facebook 專頁，
+   否則 API 出唔到 post
+5. **一個放靜態 HTML 嘅地方** —— Vercel 免費戶口最方便
