@@ -121,7 +121,10 @@
       <button class="cp" type="button" data-copy="caption">複製文案</button>
       <button class="cp" type="button" data-copy="tags">複製 hashtag</button>
       <button class="cp" type="button" data-copy="both">連 hashtag 一齊複製</button>
+      <button class="cp" type="button" id="saveBtn"
+              style="border-color:var(--general);color:var(--general);">💾 存落 Google Sheet</button>
     </div>
+    <p class="prog" id="saveMsg"></p>
   </div>
 
   <div id="tagPanel" class="panel hide">
@@ -302,6 +305,31 @@ function render() {
   }
 }
 
+// ── 商品名 ────────────────────────────────────────────────
+// 日本商品名成句都係賣點堆砌，「＜大尺碼有＞」「（附腰帶）」呢啲
+// 出 post 冇人睇。斬走括號同分隔號之後嘅嘢，淨返最前面個主體。
+function shortName(raw) {
+  const full = String(raw || '').trim();
+  let s = full;
+
+  // 有啲名開頭就係「＜大尺碼＞」呢類規格前綴，剝走先，
+  // 唔係一 split 就淨返個空字串。可能唔止一個前綴，所以要 loop。
+  let prev;
+  do {
+    prev = s;
+    s = s.replace(/^[（(＜<【[][^）)＞>】\]]*[）)＞>】\]]\s*/, '').trim();
+  } while (s !== prev && s);
+
+  s = s.split(/[（(＜<【[｜|／\/・]/)[0].trim();   // 第一個括號／分隔號就收
+  s = s.replace(/[\s　]+/g, ' ').replace(/[、,，。.]+$/, '');
+
+  // 剝到乜都冇（成個名都係括號）就用返原名，總好過空白
+  if (!s) s = full.replace(/[（()）＜＞<>【】[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const CAP = 18;                                  // 中文 18 個字，IG 上啱啱好一行
+  return s.length > CAP ? s.slice(0, CAP) + '…' : s;
+}
+
 // ── 文案 ──────────────────────────────────────────────────
 // 由真實商品資料砌出嚟：有折扣就行減價路線，冇就行推介路線。
 function buildCaption(list) {
@@ -328,7 +356,7 @@ function buildCaption(list) {
 
   // 逐件貨
   list.slice(0, 6).forEach((it, n) => {
-    const nm = it.name.length > 34 ? it.name.slice(0, 33) + '…' : it.name;
+    const nm = shortName(it.name);
     // ZOZO 好多商品名已經帶住品牌，唔好再前置多次
     const showBrand = it.brand &&
       !nm.toLowerCase().includes(it.brand.toLowerCase());
@@ -388,6 +416,58 @@ function buildTags(list) {
   t.push(shops.includes('zozo') ? '#zozotown代購' : '#nissen代購');
   return t.join(' ');
 }
+
+// ── 存落 Google Sheet（俾 Make 讀去自動出 post）────────────
+$('saveBtn').addEventListener('click', async () => {
+  const picked = items.filter(i => !i.error && i.pick);
+  if (!picked.length) return;
+
+  const btn = $('saveBtn');
+  btn.disabled = true;
+  $('saveMsg').textContent = '存緊…';
+
+  const payload = {
+    action: 'savePostDraft',
+    region,
+    shops: [...new Set(picked.map(i => SRC[i.key].label))].join(' + '),
+    caption: $('caption').textContent,
+    tags: $('tags').textContent,
+    items: picked.map(i => ({
+      name: shortName(i.name),
+      image: i.image,
+      url: i.url,
+      yen: i.yen,
+      local: Math.ceil(i.yen * rate()),
+      discount: i.discount || 0,
+    })),
+  };
+
+  // text/plain 唔會觸發 preflight，所以讀得返 GAS 嘅回覆，
+  // 唔使好似其他頁咁 no-cors 靠估佢成功咗。
+  try {
+    const res = await fetch(GAS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    const d = JSON.parse(await res.text());
+    if (d.result === 'ok') {
+      $('saveMsg').innerHTML =
+        `✅ 已存入「出Post」分頁第 <b>${d.row}</b> 行（${d.count} 件），狀態「待出」。Make 可以讀得到喇。`;
+      btn.classList.add('done');
+      setTimeout(() => btn.classList.remove('done'), 2000);
+    } else {
+      $('saveMsg').textContent = '❌ ' + (d.message || '存唔到，請再試。');
+    }
+  } catch (e) {
+    // 讀唔到回覆多數係 GAS 未重新部署，或者瀏覽器擋咗
+    $('saveMsg').innerHTML =
+      '⚠️ 收唔到 GAS 回覆，未確定存唔存到。<br>' +
+      '<span style="color:var(--muted)">多數係 GAS 未重新部署（管理部署 → 新版本）。' +
+      '請去 Google Sheet 睇下「出Post」分頁有冇新行。</span>';
+  }
+  btn.disabled = false;
+});
 
 // ── 複製 ──────────────────────────────────────────────────
 document.querySelectorAll('.cp').forEach(b => {

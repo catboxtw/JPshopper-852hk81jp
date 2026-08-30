@@ -654,7 +654,7 @@ function fetchNissenProduct_(url) {
     // 1. 商品名稱: var itemName = "..."
     var nameM = html.match(/var\s+itemName\s*=\s*"([^"]+)"/);
     if (nameM) {
-      result.name = nameM[1].trim();
+      result.name = decodeJsString_(nameM[1]);
     } else {
       var ogM = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
              || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
@@ -822,14 +822,41 @@ function translateProductInPlace_(result) {
     var joined = need.map(function(i){ return slots[i].v; }).join('\n');
     var out = LanguageApp.translate(joined, 'ja', 'zh-TW') || '';
     var parts = out.split('\n');
-    // 行數對得返先套用，唔係就保留原文，好過譯錯位
     if (parts.length === need.length) {
       need.forEach(function(idx, k) {
         var t = (parts[k] || '').trim();
         if (t) slots[idx].set(t);
       });
+      return;
     }
-  } catch(e) { /* 譯唔到就保留日文原文 */ }
+  } catch(e) { /* 跌落去逐個譯 */ }
+
+  // 一次過譯有時會併行或者拆行，行數對唔返。
+  // 以前呢個情況會成件事保留日文 —— 一件貨有幾十個尺碼顏色，
+  // 差一行就連商品名都唔譯。所以對唔返就逐個譯，慢啲但唔會全軍覆沒。
+  need.forEach(function(idx) {
+    try {
+      var t = LanguageApp.translate(slots[idx].v, 'ja', 'zh-TW');
+      if (t && t.trim()) slots[idx].set(t.trim());
+    } catch(e) { /* 呢個譯唔到就保留日文 */ }
+  });
+}
+
+// Nissen 個商品名係由頁面嘅 JS 字面值 var itemName = "…" 抽出嚟，
+// 入面啲 （ \/ \" 係未解過碼嘅轉義，照抄出去就會見到成串 （。
+function decodeJsString_(s) {
+  if (!s) return s;
+  return String(s)
+    .replace(/\\u([0-9a-fA-F]{4})/g, function(_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\x([0-9a-fA-F]{2})/g, function(_, h) {
+      return String.fromCharCode(parseInt(h, 16));
+    })
+    .replace(/\\n/g, ' ')
+    .replace(/\\t/g, ' ')
+    .replace(/\\(["'\/\\])/g, '$1')
+    .trim();
 }
 
 function nissenTranslate_(text) {
@@ -2084,6 +2111,53 @@ function doPost(e) {
       } catch(fcErr) {
         return ContentService.createTextOutput(JSON.stringify({ result: "error", message: fcErr.toString() }))
                              .setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    // ── 出 post 草稿存入「出Post」分頁（俾 Make 讀去自動出文）──
+    if (rowData.action === "savePostDraft") {
+      try {
+        var pdSheet = ss.getSheetByName("出Post");
+        if (!pdSheet) {
+          pdSheet = ss.insertSheet("出Post");
+          pdSheet.appendRow([
+            "建立時間", "地區", "店舖", "件數", "商品名", "圖片網址",
+            "商品網址", "文案", "Hashtag", "狀態", "出咗嘅時間"
+          ]);
+          pdSheet.setFrozenRows(1);
+          pdSheet.getRange(1, 1, 1, 11).setFontWeight("bold");
+        }
+
+        // Make 讀一行就夠砌一個 post：圖片同網址用換行分隔，佢自己 split
+        var pdItems  = rowData.items || [];
+        var pdImages = pdItems.map(function(i){ return i.image || ""; })
+                              .filter(String).join("\n");
+        var pdUrls   = pdItems.map(function(i){ return i.url || ""; })
+                              .filter(String).join("\n");
+        var pdNames  = pdItems.map(function(i){ return i.name || ""; })
+                              .filter(String).join("\n");
+
+        pdSheet.appendRow([
+          new Date(),
+          (rowData.region === 'tw') ? '🇹🇼 台灣' : '🇭🇰 香港',
+          rowData.shops   || "",
+          pdItems.length,
+          pdNames,
+          pdImages,
+          pdUrls,
+          rowData.caption || "",
+          rowData.tags    || "",
+          "待出",
+          ""
+        ]);
+
+        return ContentService.createTextOutput(JSON.stringify({
+          result: "ok", row: pdSheet.getLastRow(), count: pdItems.length
+        })).setMimeType(ContentService.MimeType.JSON);
+      } catch(pdErr) {
+        return ContentService.createTextOutput(JSON.stringify({
+          result: "error", message: pdErr.toString()
+        })).setMimeType(ContentService.MimeType.JSON);
       }
     }
 
