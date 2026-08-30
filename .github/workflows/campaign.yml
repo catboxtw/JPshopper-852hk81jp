@@ -1,0 +1,131 @@
+name: 📸 今期推介（出 post 素材）
+
+# 每個星期一早上自動抓一次 Nissen ／ ZOZOTOWN 嘅推介同特價貨，
+# 出一版圖片牆入 data/campaign.html，撳入去就揀得相出 post。
+#
+# 想即刻抓：Actions 分頁 → 揀「📸 今期推介」→ Run workflow
+
+on:
+  schedule:
+    # 每逢星期一 香港時間 09:00（UTC 01:00）
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+    inputs:
+      site:
+        description: '抓邊間鋪'
+        type: choice
+        options: ['兩間都抓', 'zozo', 'nissen']
+        default: '兩間都抓'
+      limit:
+        description: '最多留幾多件'
+        required: false
+        default: '24'
+      debug:
+        description: '出 campaign-debug.json（抓唔到貨時開）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 攞 code
+        uses: actions/checkout@v4
+
+      - name: 裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 裝 Playwright 同瀏覽器
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: 開始抓取
+        id: fetch
+        continue-on-error: true   # 抓唔到都要上傳 debug 檔
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          ARGS="--limit ${{ inputs.limit || '24' }}"
+          case "${{ inputs.site }}" in
+            zozo)   ARGS="$ARGS --site zozo" ;;
+            nissen) ARGS="$ARGS --site nissen" ;;
+          esac
+          # 排程跑嘅時候一律開 debug，出事先有線索追
+          if [ "${{ inputs.debug }}" = "true" ] || [ "${{ github.event_name }}" = "schedule" ]; then
+            ARGS="$ARGS --debug"
+          fi
+
+          echo "▶ node tools/fetch-campaign.mjs $ARGS"
+          node tools/fetch-campaign.mjs $ARGS 2>&1 | tee campaign-log.txt
+
+      - name: 存入 repo
+        if: hashFiles('data/campaign.json') != ''
+        run: |
+          cp campaign-log.txt data/campaign-log.txt 2>/dev/null || true
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+
+          if git diff --staged --quiet; then
+            echo "📋 同上次一樣，唔使 commit"
+            exit 0
+          fi
+
+          N=$(node -e "console.log(require('./data/campaign.json').items.length)")
+          git commit -m "今期推介：${N} 件"
+
+          for i in 1 2 3 4 5; do
+            if git push; then echo "✅ 已更新 data/campaign.html（${N} 件）"; exit 0; fi
+            echo "⚠️  遠端有新 commit，rebase 之後重試（第 $i 次）…"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || exit 1
+            sleep $(( i * 3 ))
+          done
+          echo "❌ 重試 5 次都推唔到"
+          exit 1
+
+      - name: 整理結果摘要
+        if: always()
+        run: |
+          {
+            echo "## 📸 今期推介"
+            echo ""
+            if [ -f data/campaign.json ]; then
+              N=$(node -e "console.log(require('./data/campaign.json').items.length)" 2>/dev/null || echo '?')
+              echo "✅ **抓到 $N 件**"
+              echo ""
+              echo "👉 [撳我睇圖片牆，揀相出 post](https://jpshopper-852hk81jp.vercel.app/data/campaign.html)"
+              echo ""
+              echo "（Vercel 部署完先睇到，通常一兩分鐘。亦可以喺 repo 睇 \`data/campaign-$(date +%F).csv\`）"
+            else
+              echo "❌ **抓唔到貨** —— 睇下面 log，同下載 \`campaign-debug.json\`"
+            fi
+            echo ""
+            echo "### 執行記錄"
+            echo '```'
+            tail -30 campaign-log.txt 2>/dev/null || echo '(冇 log)'
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: 上傳結果
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: campaign
+          path: |
+            data/campaign.html
+            data/campaign-*.csv
+            data/campaign.json
+            data/campaign-debug.json
+            campaign-log.txt
+          if-no-files-found: warn
+          retention-days: 30
