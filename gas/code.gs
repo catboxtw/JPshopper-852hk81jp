@@ -382,6 +382,12 @@ function doGet(e) {
     }
   }
 
+  if (action === "getNetseaProduct") {
+    var nsResult = fetchNetseaProduct_(param.url || '');
+    return ContentService.createTextOutput(JSON.stringify(nsResult))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === "getZozoProduct") {
     var zozoResult = fetchZozoProduct_(param.url || '');
     return ContentService.createTextOutput(JSON.stringify(zozoResult))
@@ -838,6 +844,95 @@ function fetchZozoProduct_(url) {
 }
 
 // 收集商品名同所有款式名，合併成一次 LanguageApp 呼叫再派返落去
+// 公仔名字典。出 post 唔會用日文原名，而 LanguageApp 譯人物名多數譯到唔知咩嚟，
+// 所以直接查表。長嘅要行先，唔係「マイメロ」會搶咗「マイメロディ」。
+var CHARACTERS_ = [
+  ['マイメロディ', '美樂蒂'], ['マイメロ', '美樂蒂'],
+  ['クロミ', '酷洛米'],
+  ['ハローキティ', 'Hello Kitty'], ['キティ', 'Hello Kitty'],
+  ['シナモロール', '大耳狗'], ['シナモン', '大耳狗'],
+  ['ポムポムプリン', '布丁狗'],
+  ['ぐでたま', '蛋黃哥'],
+  ['けろけろけろっぴ', '大眼蛙'], ['けろっぴ', '大眼蛙'],
+  ['リトルツインスターズ', '雙子星'], ['キキララ', '雙子星'], ['キキ&ララ', '雙子星'],
+  ['ハンギョドン', '人魚漢頓'],
+  ['バッドばつ丸', '酷企鵝'], ['ばつ丸', '酷企鵝'],
+  ['ポチャッコ', '帕恰狗'],
+  ['タキシードサム', '山姆企鵝'],
+  ['あひるのペックル', '貝克鴨'],
+  ['こぎみゅん', '小麥狗'],
+  ['ウィッシュミーメル', '許願兔'],
+  ['ちいかわ', '吉伊卡哇'], ['ハチワレ', '小八'], ['モモンガ', '鼯鼠'],
+  ['くりまんじゅう', '栗子饅頭'],
+  ['すみっコぐらし', '角落生物'],
+  ['コリラックマ', '小白熊'], ['キイロイトリ', '黃小鳥'], ['リラックマ', '拉拉熊'],
+  ['ミッフィー', '米飛兔'],
+  ['スヌーピー', '史努比'],
+  ['ムーミン', '嚕嚕米'],
+  ['ドラえもん', '哆啦A夢'],
+  ['ピカチュウ', '皮卡丘'], ['ポケモン', '寶可夢'],
+  ['パペットスンスン', '啾啾'],
+  ['くまのプーさん', '小熊維尼'], ['プーさん', '小熊維尼'],
+  ['スティッチ', '史迪奇'],
+  ['トトロ', '龍貓'],
+  ['サンリオ', '三麗鷗']
+];
+
+function detectCharacter_(text) {
+  if (!text) return '';
+  for (var i = 0; i < CHARACTERS_.length; i++) {
+    if (text.indexOf(CHARACTERS_[i][0]) !== -1) return CHARACTERS_[i][1];
+  }
+  return '';
+}
+
+// NETSEA 商品頁。出 post 只需要商品名、相、同埋「メーカー希望小売価格」——
+// 卸價唔會出街，所以呢度唔攞。
+function fetchNetseaProduct_(url) {
+  if (!url || url.indexOf('netsea.jp') === -1) {
+    return { error: '請輸入有效的商品網址' };
+  }
+  try {
+    var resp = UrlFetchApp.fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ja,en;q=0.5'
+      },
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (resp.getResponseCode() !== 200) {
+      return { error: '無法讀取商品頁面 (HTTP ' + resp.getResponseCode() + ')' };
+    }
+    var html = resp.getContentText('UTF-8');
+    var result = { name: '', image: null, price: null, variants: [], rawUrl: url };
+
+    var ogT = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+    if (ogT) result.name = decodeJsString_(ogT[1]);
+    var ogI = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if (ogI) result.image = ogI[1];
+
+    // 上代（メーカー希望小売価格）寫成「3,500円/点（税抜）」，
+    // 卸價寫成「2,415円（税抜）」—— 靠「円/点」分得出邊個係邊個。
+    var rp = html.match(/([0-9][0-9,]*)\s*<span[^>]*class=["']taxUnit["'][^>]*>\s*円\s*\/\s*点/);
+    if (rp) result.retailYen = parseInt(rp[1].replace(/,/g, ''), 10);
+
+    // 公仔名由日文原名度認，譯完就搵唔返
+    result.character = detectCharacter_(result.name);
+
+    if (!result.name) return { error: '攞唔到商品資料，請確認網址' };
+    if (!result.retailYen) {
+      result.warn = '搵唔到「メーカー希望小売価格」，價錢要自己填';
+    }
+
+    translateProductInPlace_(result);
+    return result;
+  } catch (e) {
+    return { error: '抓取失敗：' + e.toString() };
+  }
+}
+
 function translateProductInPlace_(result) {
   var slots = [];   // { get, set }
   if (result.name) slots.push({ v: result.name, set: function(t){ result.name = t; } });

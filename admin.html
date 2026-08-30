@@ -1479,6 +1479,8 @@ let filterHK = 'all', filterTW = 'all';
 function unlock() {
   const pw = document.getElementById('pwInput').value;
   if (pw === '4916') {
+    // 出 post 助手同一個閘，入咗一次唔使再入
+    try { sessionStorage.setItem('adminOk', '1'); } catch (e) {}
     document.getElementById('lockScreen').style.display = 'none';
     document.getElementById('adminApp').style.display = 'block';
     window.scrollTo(0, 0);

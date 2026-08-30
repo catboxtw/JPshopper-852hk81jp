@@ -62,6 +62,10 @@
     line-height:1.5;color:var(--ink);background:var(--bg);border:1px solid var(--border);
     border-radius:6px;padding:6px 8px}
   .nmedit:focus{outline:2px solid var(--general);outline-offset:1px;background:var(--card)}
+  .chedit{flex:1;min-width:0;font-family:inherit;font-size:13px;font-weight:700;
+    color:var(--ink);background:var(--bg);border:1px solid var(--border);
+    border-radius:6px;padding:6px 8px}
+  .chedit:focus{outline:2px solid var(--general);outline-offset:1px;background:var(--card)}
   .undo{border:1px solid var(--border);background:var(--card);color:var(--muted);
     border-radius:6px;width:26px;height:26px;flex:none;cursor:pointer;
     font-size:13px;line-height:1;padding:0}
@@ -88,11 +92,35 @@
   h2{font-size:14px;font-weight:700;margin-bottom:11px;display:flex;align-items:baseline;gap:9px}
   h2 span{font-size:11px;font-weight:400;color:var(--muted)}
   .hide{display:none}
+  #lock{position:fixed;inset:0;z-index:200;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;padding:24px}
+  /* #lock 嘅 display:flex 特異度高過 [hidden]，唔寫呢行嘅話
+     入完密碼塊遮罩會透明咁繼續擋住所有掣 */
+  #lock[hidden]{display:none}
+  .lockBox{text-align:center;max-width:280px;width:100%}
+  #lock input{width:100%;text-align:center;letter-spacing:8px;font-size:20px;
+    font-family:inherit;padding:12px;border:1px solid var(--border);border-radius:8px;
+    background:var(--card);color:var(--ink)}
+  #lock button{width:100%;margin-top:10px;border:none;background:var(--ink);color:#fff;
+    padding:12px;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer}
   a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--general);outline-offset:2px}
 </style>
+<!-- QR 產生器擺喺自己度，唔靠 CDN —— CDN 載唔到嘅話會靜靜咁出一批冇 QR 嘅卡 -->
+<script src="/vendor/qrcode.js"></script>
 </head>
 <body>
 
+<div id="lock">
+  <div class="lockBox">
+    <h1 style="font-family:'Shippori Mincho',serif;font-size:20px;letter-spacing:3px;">852hk.81jp</h1>
+    <p style="font-size:11px;letter-spacing:2px;color:var(--muted);margin:4px 0 18px;">ADMIN</p>
+    <input type="password" id="pw" placeholder="••••" inputmode="numeric" autocomplete="off">
+    <button type="button" id="pwBtn">進入</button>
+    <p id="pwMsg" style="font-size:11px;color:var(--hk);margin-top:10px;min-height:16px;"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
 <div class="topbar">
   <a class="brand" href="/">852hk.81jp</a>
   <a class="back" href="/">← 返首頁</a>
@@ -101,13 +129,13 @@
 <div class="wrap">
   <h1>出 post 助手</h1>
   <p class="lede">
-    貼低 Nissen 或者 ZOZOTOWN 嘅<strong>商品網址</strong>（一行一條），
+    貼低<strong>商品網址</strong>（一行一條）—— Nissen、ZOZOTOWN、日本雜貨都得。
     幫你攞返商品相、譯好嘅名同埋計好嘅價錢，再寫埋文案同 hashtag。
   </p>
 
   <div class="panel">
     <label class="fl" for="urls">商品網址（一行一條，最多 10 條）</label>
-    <textarea id="urls" placeholder="https://www.nissen.co.jp/item/...&#10;https://zozo.jp/shop/.../"></textarea>
+    <textarea id="urls" placeholder="https://www.nissen.co.jp/item/...&#10;https://zozo.jp/shop/.../&#10;https://www.netsea.jp/shop/..."></textarea>
     <div class="row">
       <div class="seg" id="regSeg">
         <button type="button" data-r="hk" class="on">🇭🇰 香港版</button>
@@ -121,6 +149,13 @@
           <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
         </select>
         件
+      </label>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;"
+             title="日本雜貨售價 ＝ 上代 × 1.1（連稅）× 呢個倍率">
+        雜貨倍率
+        <input id="nsFactor" type="number" step="0.001" min="0" value="0.052"
+               style="width:78px;font-family:inherit;font-size:13px;padding:8px 9px;
+               border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--ink);">
       </label>
       <button class="go" id="goBtn" type="button">攞資料</button>
     </div>
@@ -158,6 +193,27 @@
 </div>
 
 <script>
+// 同 admin 一樣嘅四位數。呢個係前端檢查，擋得住路過嘅人，
+// 擋唔住肯睇 source code 嘅人 —— 真正嘅保護要喺伺服器嗰邊做。
+const ADMIN_PIN = '4916';
+function openApp() {
+  document.getElementById('lock').hidden = true;
+  document.getElementById('app').hidden = false;
+}
+if (sessionStorage.getItem('adminOk') === '1') openApp();
+function tryPin() {
+  const el = document.getElementById('pw');
+  if (el.value === ADMIN_PIN) {
+    try { sessionStorage.setItem('adminOk', '1'); } catch (e) {}
+    openApp();
+  } else {
+    el.value = '';
+    document.getElementById('pwMsg').textContent = '密碼錯誤';
+  }
+}
+document.getElementById('pwBtn').addEventListener('click', tryPin);
+document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryPin(); });
+
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
 const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
@@ -184,7 +240,11 @@ const CFG = { hk: 0.057, tw: 0.24, shipHk: 4.5, shipTw: 20 };
 const SRC = {
   nissen: { label: 'NISSEN',   action: 'getNissenProduct', re: /nissen\.co\.jp/i },
   zozo:   { label: 'ZOZOTOWN', action: 'getZozoProduct',   re: /zozo\.jp/i },
+  // 呢個來源嘅名唔可以出街 —— 卡、文案、Sheet 一律用「日本雜貨」，
+  // 而張卡上面嗰行改為出公仔名。
+  netsea: { label: '日本雜貨', action: 'getNetseaProduct', re: /netsea\.jp/i },
 };
+const isNetsea = (it) => it && it.key === 'netsea';
 const srcOf = (u) => Object.keys(SRC).find(k => SRC[k].re.test(u)) || null;
 
 let region = 'hk';
@@ -194,6 +254,12 @@ let curPost = 0;   // 預覽緊第幾個 post
 // IG carousel 要每個 post 張數一樣，Make 先至 map 得死 —— 所以夠一組就切一組，
 // 唔夠一組嘅尾數唔會存，留返喺頁面度等你揀多幾件。
 const perPost = () => parseInt($('perPost').value) || 3;
+
+// 日本雜貨嗰批唔報日圓，直接出售價：上代 × 1.1（連稅）× 倍率
+const TAX = 1.1;
+const factor = () => parseFloat($('nsFactor').value) || 0.052;
+const nsPrice = (it) => Math.round(((it.retailYen || 0) * TAX * factor()) * 10) / 10;
+const nsPriceTxt = (it) => (region === 'hk' ? 'HK$' : 'NT$') + nsPrice(it).toFixed(1);
 function postGroups() {
   const picked = items.filter(i => !i.error && i.pick);
   const n = perPost();
@@ -217,6 +283,7 @@ document.querySelectorAll('#regSeg button').forEach(b => {
 
 $('goBtn').addEventListener('click', run);
 $('perPost').addEventListener('change', () => { curPost = 0; if (items.length) render(); });
+$('nsFactor').addEventListener('input', () => { if (items.length) render(); });
 
 async function run() {
   const urls = $('urls').value.split('\n').map(s => s.trim())
@@ -267,7 +334,9 @@ async function fetchOne(url, key) {
       return { url, key, error: '你部 GAS 仲未識呢個指令，要喺 Apps Script 重新部署（管理部署 → 新版本）。' };
     }
     if (d.error) return { url, key, error: d.message || d.error };
-    if (!d.name && !d.price) return { url, key, error: '攞唔到商品資料，請確認網址。' };
+    if (!d.name && !d.price && !d.retailYen) {
+      return { url, key, error: '攞唔到商品資料，請確認網址。' };
+    }
 
     return {
       url, key,
@@ -279,6 +348,9 @@ async function fetchOne(url, key) {
       discount: d.discountRate || 0,
       brand: d.brand || '',
       shop: d.shop || '',
+      retailYen: d.retailYen || 0,   // 上代，日本雜貨用嚟計售價
+      character: d.character || '',  // 認到嘅公仔名
+      warn: d.warn || '',
       variants: d.variants || [],
       pick: true,
     };
@@ -313,7 +385,13 @@ function render() {
           ${it.image ? `<img src="${esc(it.image)}" alt="" loading="lazy">` : ''}
         </a>
         <div class="bd">
-          ${it.brand || it.shop ? `<p class="br">${esc([it.brand, it.shop].filter(Boolean).join(' · '))}</p>` : ''}
+          ${isNetsea(it) ? `
+            <div class="nmrow">
+              <input class="chedit" data-n="${n}" value="${esc(dispBrand(it))}" maxlength="20"
+                     placeholder="公仔名（張卡最當眼嗰行）" aria-label="公仔名">
+            </div>`
+            : (it.brand || it.shop
+              ? `<p class="br">${esc([it.brand, it.shop].filter(Boolean).join(' · '))}</p>` : '')}
           <div class="nmrow">
             <input class="nmedit" data-n="${n}" value="${esc(dispName(it))}" maxlength="40"
                    aria-label="商品名（出 post 同張卡都用呢個）">
@@ -321,10 +399,17 @@ function render() {
                     title="回復原本嘅名" ${it.editName === undefined ? 'hidden' : ''}>↺</button>
           </div>
           <p class="orig" title="${esc(it.name)}">原名：${esc(it.name)}</p>
-          <p class="pr">¥${it.yen.toLocaleString()}${it.yenMax && it.yenMax !== it.yen ? '〜' + it.yenMax.toLocaleString() : ''}
-            ${it.origYen && it.origYen > it.yen ? `<s>¥${it.origYen.toLocaleString()}</s>` : ''}</p>
-          <p class="lo" style="color:var(--${region})">${local(it.yen)}${it.yenMax && it.yenMax !== it.yen ? '起' : ''}</p>
-          ${inStock ? `<p class="st">${inStock} 個尺碼／顏色有貨</p>` : ''}
+          ${isNetsea(it) ? `
+            <p class="pr">上代 ¥${(it.retailYen || 0).toLocaleString()}</p>
+            <p class="lo" style="color:var(--${region})">${nsPriceTxt(it)}
+              <span style="color:var(--muted);font-weight:400;">
+                ＝ ${(it.retailYen || 0).toLocaleString()} × 1.1 × ${factor()}</span></p>
+            ${it.warn ? `<p class="st" style="color:var(--hk)">⚠️ ${esc(it.warn)}</p>` : ''}`
+          : `
+            <p class="pr">¥${it.yen.toLocaleString()}${it.yenMax && it.yenMax !== it.yen ? '〜' + it.yenMax.toLocaleString() : ''}
+              ${it.origYen && it.origYen > it.yen ? `<s>¥${it.origYen.toLocaleString()}</s>` : ''}</p>
+            <p class="lo" style="color:var(--${region})">${local(it.yen)}${it.yenMax && it.yenMax !== it.yen ? '起' : ''}</p>
+            ${inStock ? `<p class="st">${inStock} 個尺碼／顏色有貨</p>` : ''}`}
         </div>
       </div>`;
   }).join('');
@@ -346,6 +431,12 @@ function render() {
       renderCaption();
     });
   });
+  document.querySelectorAll('.chedit').forEach(inp => {
+    inp.addEventListener('input', () => {
+      items[+inp.dataset.n].editChar = inp.value;
+      renderCaption();
+    });
+  });
   document.querySelectorAll('[data-undo]').forEach(b => {
     b.addEventListener('click', () => {
       delete items[+b.dataset.undo].editName;
@@ -359,6 +450,13 @@ function render() {
 // 商品名：改過就用改咗嗰個，冇改就用斬短咗嘅原名
 function dispName(it) {
   return it.editName !== undefined ? it.editName : shortName(it.name);
+}
+
+// 張卡上面嗰行：日本雜貨出公仔名，其餘出店舖名
+function dispBrand(it) {
+  if (it.editChar !== undefined) return it.editChar;
+  if (isNetsea(it)) return it.character || '';
+  return SRC[it.key].label;
 }
 
 function renderCaption() {
@@ -453,15 +551,17 @@ function buildCaption(list) {
   const shopTxt = shops.join(' ＋ ');
   const best = list.reduce((a, b) => (b.discount || 0) > (a.discount || 0) ? b : a, list[0]);
   const onSale = list.filter(i => i.discount > 0);
-  const cheapest = list.reduce((a, b) => b.yen < a.yen ? b : a, list[0]);
+  const priceOf = (i) => isNetsea(i) ? nsPrice(i) : i.yen;
+  const cheapest = list.reduce((a, b) => priceOf(b) < priceOf(a) ? b : a, list[0]);
+  const cheapTxt = isNetsea(cheapest) ? nsPriceTxt(cheapest) : local(cheapest.yen);
 
   const L = [];
 
   // 開場
   if (onSale.length) {
     L.push(hk
-      ? `${shopTxt} 減緊 🔥 最平嗰件 ${local(cheapest.yen)} 就有`
-      : `${shopTxt} 特價中 🔥 最低 ${local(cheapest.yen)} 就有`);
+      ? `${shopTxt} 減緊 🔥 最平嗰件 ${cheapTxt} 就有`
+      : `${shopTxt} 特價中 🔥 最低 ${cheapTxt} 就有`);
   } else {
     L.push(hk
       ? `${shopTxt} 今期推介 🇯🇵`
@@ -475,9 +575,14 @@ function buildCaption(list) {
     // ZOZO 好多商品名已經帶住品牌，唔好再前置多次
     const showBrand = it.brand &&
       !nm.toLowerCase().includes(it.brand.toLowerCase());
-    const bits = [`${n + 1}. ${showBrand ? it.brand + ' ' : ''}${nm}`];
-    let price = `　　¥${it.yen.toLocaleString()}`;
-    if (it.yenMax && it.yenMax !== it.yen) price += '起';
+    // 公仔名／品牌已經喺個名入面就唔好再前置，唔係會變「酷洛米 酷洛米 三摺銀包」
+    const ch = dispBrand(it);
+    const prefix = isNetsea(it)
+      ? (ch && !nm.includes(ch) ? ch + ' ' : '')
+      : (showBrand ? it.brand + ' ' : '');
+    const bits = [`${n + 1}. ${prefix}${nm}`];
+    let price = isNetsea(it) ? `　　${nsPriceTxt(it)}` : `　　¥${it.yen.toLocaleString()}`;
+    if (!isNetsea(it) && it.yenMax && it.yenMax !== it.yen) price += '起';
     if (it.discount) price += hk ? `（減緊 ${it.discount}%）` : `（${it.discount}% OFF）`;
     bits.push(price);
     L.push(bits.join('\n'));
@@ -491,7 +596,7 @@ function buildCaption(list) {
   if (hk) {
     L.push('⚖️ 國際運費只計實重，冇體積重 — 買衫最抵');
     L.push(`📦 到港運費 HK$${CFG.shipHk}／50g`);
-    L.push('🚚 每兩星期由日本寄出，順豐到付／郵局易寄取／平郵任揀');
+    L.push('🚚 每兩星期由日本寄出，郵局易寄取運費只要HK$10-13！可以7仔/郵局/智郵站拎');
     L.push('');
     L.push('💬 想落單或者想問其他商品：');
     L.push('　① DM 我哋，貼低商品網址，即刻同你計');
@@ -525,6 +630,15 @@ function buildTags(list) {
   const hk = region === 'hk';
   const shops = [...new Set(list.map(i => i.key))];
   const t = ['#日本代購'];
+
+  // 日本雜貨嗰批唔可以出個網站名，改為打公仔名 —— 搜嗰個名嘅人本身就係客
+  if (shops.includes('netsea')) {
+    t.push(hk ? '#香港代購' : '#台灣代購');
+    const ch = list.filter(isNetsea).map(dispBrand).filter(Boolean)[0];
+    t.push(ch ? '#' + ch.replace(/\s+/g, '') : '#日本雜貨');
+    return t.join(' ');
+  }
+
   // ZOZO 客要款，Nissen 客要實用平價，所以第二個 tag 唔同
   if (shops.includes('zozo') && hk) t.push('#日系穿搭');
   else t.push(hk ? '#香港代購' : '#台灣代購');
@@ -541,6 +655,7 @@ const CARD_W = 1080, CARD_H = 1350, M = 80;
 const PAPER = {
   nissen: { paper:'#F2EFE9', rule:'#DDD8CE', seq:'#E0DBD1', shot:'#E4E0D7', muted:'#8A857C' },
   zozo:   { paper:'#E7E8E4', rule:'#D2D4CE', seq:'#D7D9D3', shot:'#DADCD6', muted:'#82857F' },
+  netsea: { paper:'#E4EDF3', rule:'#CBDAE4', seq:'#D2E0E9', shot:'#D6E3EB', muted:'#7C8992' },
 };
 const CARD = { ink:'#1F1D1A', hk:'#C0392B', tw:'#2980B9' };
 
@@ -573,6 +688,33 @@ async function loadPic(url) {
   })();
   picCache.set(url, p);
   return p;
+}
+
+// QR 直接畫格仔落 canvas，唔經 DOM／圖片，所以匯出唔會有跨網站問題
+const QR_SIZE = 96;
+function drawQr(ctx, text, x, y, size) {
+  if (typeof qrcode !== 'function') {
+    throw new Error('QR 產生器載入唔到（/vendor/qrcode.js），出唔到卡');
+  }
+  try {
+    const qr = qrcode(0, 'M');                // type 0 = 按長度自動揀
+    qr.addData(text);
+    qr.make();
+    const n = qr.getModuleCount();
+    const cell = size / n;
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(x - 8, y - 8, size + 16, size + 16);   // 留白，唔留就掃唔到
+    ctx.fillStyle = '#1F1D1A';
+    for (let r = 0; r < n; r++) {
+      for (let c = 0; c < n; c++) {
+        if (!qr.isDark(r, c)) continue;
+        // 每格多畫一點，避免縮放之後格與格之間見到白線
+        ctx.fillRect(x + c * cell, y + r * cell, cell + 0.6, cell + 0.6);
+      }
+    }
+    ctx.restore();
+  } catch (e) { /* 網址太長編唔到就唔畫 */ }
 }
 
 function drawCover(ctx, im, x, y, w, h) {
@@ -646,43 +788,69 @@ async function drawCard(item, seq) {
   ctx.strokeRect(M + .5, 180.5, 919, 819);
 
   // 品牌
-  // 一律出店舖名，唔出商品品牌 —— 成套卡睇落先至齊整
-  const brand = SRC[item.key].label;
-  ctx.fillStyle = P.muted;
-  ctx.font = '400 23px "Noto Sans TC", sans-serif';
-  ctx.letterSpacing = '5.98px';                // 0.26em
-  ctx.fillText(brand, M, 1046);
-  ctx.letterSpacing = '0px';
+  // 一律出店舖名，唔出商品品牌 —— 成套卡睇落先至齊整。
+  // 日本雜貨嗰批改為出公仔名，因為公仔名先係人哋搜嘅嘢，所以大隻啲深色啲。
+  const brand = dispBrand(item);
+  if (brand) {
+    if (isNetsea(item)) {
+      ctx.fillStyle = CARD.ink;
+      ctx.font = '500 36px "Noto Sans TC", sans-serif';
+      ctx.letterSpacing = '2.9px';
+      ctx.fillText(brand, M, 1030);
+    } else {
+      ctx.fillStyle = P.muted;
+      ctx.font = '400 23px "Noto Sans TC", sans-serif';
+      ctx.letterSpacing = '5.98px';             // 0.26em
+      ctx.fillText(brand, M, 1046);
+    }
+    ctx.letterSpacing = '0px';
+  }
 
-  // 商品名，最多兩行
+  // 商品名，最多兩行。公仔名已經喺上面嗰行出咗，就唔好喺個名度再出多次。
+  let cardName = dispName(item);
+  if (brand && isNetsea(item)) {
+    cardName = cardName.replace(brand, '').replace(/^[\s　·・、,，-]+/, '').trim() || cardName;
+  }
   ctx.fillStyle = CARD.ink;
   ctx.font = '500 54px "Noto Serif TC", serif';
-  wrapText(ctx, dispName(item), 600, 2)
+  wrapText(ctx, cardName, 600, 2)
     .forEach((ln, i) => ctx.fillText(ln, M, 1086 + i * 68));
 
-  // 日圓價（唔出港幣／台幣 —— 匯率會變，張卡會留喺 feed 好耐）
+  // Nissen／ZOZO 出日圓（匯率會變，張卡會留喺 feed 好耐，寫死本地價遲早唔啱）；
+  // 日本雜貨直接出售價，因為嗰個係算好嘅賣價，唔係即時匯率換算。
   ctx.textAlign = 'right';
   ctx.fillStyle = accent;
   ctx.font = '500 56px "IBM Plex Mono", monospace';
-  // 唔同碼唔同價嗰啲要寫「起」，唔係人哋照住最平嗰個價嚟問就麻煩
-  const yenTxt = '¥' + item.yen.toLocaleString() +
-    (item.yenMax && item.yenMax !== item.yen ? '起' : '');
-  ctx.fillText(yenTxt, R, 1080);
+  const priceTxt = isNetsea(item)
+    ? nsPriceTxt(item)
+    : '¥' + item.yen.toLocaleString() +
+      // 唔同碼唔同價嗰啲要寫「起」，唔係人哋照住最平嗰個價嚟問就麻煩
+      (item.yenMax && item.yenMax !== item.yen ? '起' : '');
+  ctx.fillText(priceTxt, R, 1080);
+
+  ctx.fillStyle = accent;
+  ctx.fillRect(R - 96, 1152, 96, 2);
 
   ctx.fillStyle = P.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '1.76px';                // 0.08em
-  ctx.fillText(region === 'hk' ? '港幣報價 → DM' : '台幣報價 → 私訊', R, 1180);
+  if (isNetsea(item)) {
+    // 冇 QR，所以 CTA 照舊擺喺價錢下面
+    ctx.fillText(region === 'hk' ? 'DM 落單' : '私訊下單', R, 1180);
+  } else {
+    // QR 喺右下角，CTA 兩短行擺喺 QR 左邊
+    ctx.fillText(region === 'hk' ? '掃碼睇商品' : '掃碼看商品', R - QR_SIZE - 20, 1198);
+    ctx.fillText(region === 'hk' ? '報價 → DM'  : '報價 → 私訊', R - QR_SIZE - 20, 1230);
+  }
   ctx.letterSpacing = '0px';
 
-  ctx.fillStyle = accent;
-  ctx.fillRect(R - 96, 1152, 96, 2);
+  // 商品網址嘅 QR。日本雜貨唔出 —— 唔可以引人去嗰個網站。
+  if (!isNetsea(item) && item.url) drawQr(ctx, item.url, R - QR_SIZE, 1174, QR_SIZE);
 
   // 頁腳
   ctx.fillStyle = P.muted;
   ctx.font = '400 22px "Noto Sans TC", sans-serif';
   ctx.letterSpacing = '3.08px';                // 0.14em
-  ctx.fillText('日本直送', R, 1302);
   ctx.textAlign = 'left';
   ctx.fillText(region === 'hk' ? '852hk.81jp' : '886tw.81jp', M, 1302);
   ctx.letterSpacing = '0px';
@@ -765,7 +933,7 @@ $('saveBtn').addEventListener('click', async () => {
         name: dispName(i),
         image: cards[k],          // ← 出 post 卡，唔係原相
         url: i.url,
-        yen: i.yen,
+        yen: isNetsea(i) ? nsPrice(i) : i.yen,
         discount: i.discount || 0,
       })),
     };
