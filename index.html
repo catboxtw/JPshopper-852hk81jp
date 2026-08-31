@@ -559,7 +559,9 @@ function buildOrderedQty(qtyData) {
   qtyData.forEach(q => { out[q.product_name + '|' + q.sub_name] = q.qty_ordered; });
   return out;
 }
-const EXCLUDED = ["Blank", "易寄取地址", "訂單紀錄", "Sheet1", "工作表1", "收單截止時間", "購貨紀錄", "盈利紀錄"];
+// 唔係活動嘅分頁。GAS 嗰邊有份一樣嘅（SYSTEM_SHEETS_），加新分頁兩邊都要加。
+const EXCLUDED = ["Blank", "易寄取地址", "訂單紀錄", "Sheet1", "工作表1", "收單截止時間",
+                  "購貨紀錄", "盈利紀錄", "Nissen精選", "出Post", "已出商品"];
 
 let currentRegion = localStorage.getItem('region') || 'hk';
 let allSheets = [];

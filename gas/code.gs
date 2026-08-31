@@ -135,6 +135,20 @@ function jsonpOrJson_(param, data) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// 唔係活動嘅分頁。加新分頁嘅時候記住加落嚟，
+// 唔係佢會當咗係一個活動，走去首頁「現場快閃代購」嗰度出現。
+var SYSTEM_SHEETS_ = [
+  "訂單紀錄", "易寄取地址", "Blank", "Sheet1", "工作表1",
+  "收單截止時間", "購貨紀錄", "盈利紀錄", "Nissen精選",
+  "出Post", "已出商品"
+];
+
+function isSystemSheet_(name) {
+  if (!name) return true;
+  if (name.indexOf("[Data]") === 0) return true;
+  return SYSTEM_SHEETS_.indexOf(name) !== -1;
+}
+
 function doGet(e) {
   var param = (e && e.parameter) ? e.parameter : {};
   var action = param.action;
@@ -182,7 +196,7 @@ function doGet(e) {
   if (action === "getSheets") {
     var sheets = ss.getSheets();
     var sheetNames = [];
-    var sysSheets = ["訂單紀錄", "易寄取地址", "Blank", "收單截止時間", "購貨紀錄", "盈利紀錄"];
+    var sysSheets = SYSTEM_SHEETS_;
     for (var i = 0; i < sheets.length; i++) {
       var sn = sheets[i].getName();
       // 排除 [Data] 前綴的 system sheet 和固定名稱
@@ -654,10 +668,7 @@ function doGet(e) {
     var sheets = ss.getSheets();
     for (var i = 0; i < sheets.length; i++) {
       var n = sheets[i].getName();
-      if (!n.startsWith("[Data]") && n !== "訂單紀錄" && n !== "易寄取地址" && n !== "Blank" && n !== "收單截止時間") {
-        targetSheetName = n;
-        break;
-      }
+      if (!isSystemSheet_(n)) { targetSheetName = n; break; }
     }
   }
 
@@ -3270,7 +3281,7 @@ function sendPaidEmailToCustomer(ss, rowValues) {
 // syncAndGetDeadlines：自動同步 event 分頁到「收單截止時間」
 // =================================================================
 function syncAndGetDeadlines(ss) {
-  var EXCLUDED = ["訂單紀錄", "易寄取地址", "Blank", "收單截止時間", "購貨紀錄", "盈利紀錄"];
+  var EXCLUDED = SYSTEM_SHEETS_;
   var allSheets = ss.getSheets();
   var deadlineSheet = ss.getSheetByName("收單截止時間");
   
@@ -3826,7 +3837,7 @@ function refreshPostedStock() {
 // 俾後台「購貨總覽」一眼睇晒邊個團仲未買完。
 // =================================================================
 function getOrderSummaryAll(ss) {
-  var sysSheets = ["訂單紀錄", "易寄取地址", "Blank", "收單截止時間", "購貨紀錄", "盈利紀錄", "Nissen精選"];
+  var sysSheets = SYSTEM_SHEETS_;
   var sheets = ss.getSheets();
   var events = [];
 
