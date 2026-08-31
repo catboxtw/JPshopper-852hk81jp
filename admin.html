@@ -1438,7 +1438,9 @@ async function sbAdminGet(path) {
 async function sbAdminUpsert(table, rows) {
   await fetch(`${SUPA_URL}/rest/v1/${table}`, { method:'POST', headers: SUPA_H, body: JSON.stringify(rows) });
 }
-const EXCLUDED = ["Blank","易寄取地址","訂單紀錄","收單截止時間","購貨紀錄","盈利紀錄"];
+// 唔係活動嘅分頁。GAS 嗰邊有份一樣嘅（SYSTEM_SHEETS_），加新分頁兩邊都要加。
+const EXCLUDED = ["Blank","易寄取地址","訂單紀錄","Sheet1","工作表1","收單截止時間",
+                  "購貨紀錄","盈利紀錄","Nissen精選","出Post","已出商品"];
 
 // ── State ──
 let allSheets = [];
