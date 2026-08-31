@@ -3679,6 +3679,149 @@ function savePostedItems_(ss, rowData, items) {
 }
 
 // =================================================================
+// backfillPostedItems：喺 Apps Script 度手動行一次，
+// 將「出Post」啲舊行補寫入「已出商品」。
+// 舊行冇存原相／款式／逐件價錢，所以呢度只補到名、卡圖、網址；
+// 價錢同款式留返 refreshPostedStock() 去填。
+// =================================================================
+function backfillPostedItems() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var src = ss.getSheetByName("出Post");
+  if (!src || src.getLastRow() < 2) return "冇「出Post」資料";
+
+  var rows = src.getRange(2, 1, src.getLastRow() - 1, 11).getValues();
+  var added = 0, skipped = 0;
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    // E商品名、F圖片網址（全部）、G商品網址 —— 三欄都係逐件一行
+    var names = (r[4] || "").toString().split("\n");
+    var pics  = (r[5] || "").toString().split("\n");
+    var urls  = (r[6] || "").toString().split("\n");
+    var items = [];
+    for (var k = 0; k < urls.length; k++) {
+      var u = (urls[k] || "").trim();
+      if (!u) continue;
+      items.push({
+        name:  (names[k] || "").trim(),
+        image: (pics[k]  || "").trim(),
+        photo: "",            // 舊行冇存原相
+        url:   u,
+        yen:   0,             // 等 refreshPostedStock() 填
+        currency: "JPY",
+        variants: []
+      });
+    }
+    if (!items.length) { skipped++; continue; }
+    savePostedItems_(ss, {
+      region: (r[1] || "").toString().indexOf("台灣") !== -1 ? "tw" : "hk",
+      shops:  r[2] || ""
+    }, items);
+    added += items.length;
+  }
+
+  var msg = "補寫完：睇咗 " + rows.length + " 個 post，處理 " + added + " 件"
+          + "（重複網址唔會再開行），跳過 " + skipped + " 行冇網址嘅。\n"
+          + "跟住行 refreshPostedStock() 補返價錢同款式。";
+  Logger.log(msg);
+  return msg;
+}
+
+// =================================================================
+// refreshPostedStock：逐件返去原網站查返價錢同庫存。
+// 全部款式冇貨、或者條網址已經死咗，就自動落架（顯示 = FALSE）。
+//
+// 設一個「時間驅動」觸發器每日行一次就得。
+// GAS 一次最多行 6 分鐘，所以每次只查一批，用 ScriptProperties 記住行到邊，
+// 下次接住行；行完一圈自動由頭再嚟。
+// =================================================================
+function refreshPostedStock() {
+  var BATCH = 15;                        // 一次查幾多件，唔好貪心
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName("已出商品");
+  if (!sh || sh.getLastRow() < 2) return "冇商品";
+
+  // 補返「最後檢查」同「備註」兩欄標題
+  if (sh.getLastColumn() < 13) {
+    sh.getRange(1, 12, 1, 2).setValues([["最後檢查", "備註"]]).setFontWeight("bold");
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var start = parseInt(props.getProperty("stock_cursor") || "0", 10) || 0;
+  var total = sh.getLastRow() - 1;
+  if (start >= total) start = 0;
+
+  var count = Math.min(BATCH, total - start);
+  var range = sh.getRange(2 + start, 1, count, 13);
+  var rows = range.getValues();
+  var offCount = 0, okCount = 0;
+
+  for (var i = 0; i < rows.length; i++) {
+    var url = (rows[i][6] || "").toString().trim();
+    if (!url) continue;
+
+    var res = null;
+    try {
+      if (url.indexOf("nissen.co.jp") !== -1)   res = fetchNissenProduct_(url);
+      else if (url.indexOf("zozo.jp") !== -1)   res = fetchZozoProduct_(url);
+      else if (url.indexOf("netsea.jp") !== -1) res = fetchNetseaProduct_(url);
+    } catch (e) {
+      res = { error: e.toString() };
+    }
+
+    rows[i][11] = new Date();
+
+    if (!res) {                                  // 唔識呢個網站，唔郁佢
+      rows[i][12] = "唔識呢個網站，冇檢查";
+      continue;
+    }
+    if (res.error) {                             // 頁面死咗／改咗網址 → 落架
+      rows[i][10] = false;
+      rows[i][12] = "落架：" + res.error;
+      offCount++;
+      continue;
+    }
+
+    // 價錢：Nissen／ZOZO 用日圓售價；日本雜貨嗰批係上代，唔喺度改
+    if (url.indexOf("netsea.jp") === -1 && res.price) {
+      rows[i][7] = res.price;
+      rows[i][8] = "JPY";
+    }
+
+    var vs = res.variants || [];
+    if (vs.length) {
+      rows[i][9] = JSON.stringify(vs);
+      // 全部款式都冇貨 = 冇得賣，即刻落架，唔好等人落咗單先知
+      var anyStock = false;
+      for (var g = 0; g < vs.length && !anyStock; g++) {
+        var opts = vs[g].options || [];
+        for (var o = 0; o < opts.length; o++) {
+          if (opts[o].inStock) { anyStock = true; break; }
+        }
+      }
+      if (!anyStock) {
+        rows[i][10] = false;
+        rows[i][12] = "落架：全部款式都冇貨";
+        offCount++;
+        continue;
+      }
+    }
+
+    rows[i][10] = true;                          // 有返貨就自動上返架
+    rows[i][12] = "有貨";
+    okCount++;
+  }
+
+  range.setValues(rows);
+  props.setProperty("stock_cursor", String(start + count));
+
+  var msg = "查咗第 " + (start + 1) + "–" + (start + count) + " 件（共 " + total + " 件）："
+          + "有貨 " + okCount + "，落架 " + offCount + "。";
+  Logger.log(msg);
+  return msg;
+}
+
+// =================================================================
 // getOrderSummaryAll：逐個活動計「要買幾多錢」同「買咗幾多錢」，
 // 俾後台「購貨總覽」一眼睇晒邊個團仲未買完。
 // =================================================================
