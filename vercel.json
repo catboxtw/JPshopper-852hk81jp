@@ -7,6 +7,8 @@
     { "src": "/status", "dest": "/status.html" },
     { "src": "/post", "dest": "/post.html" },
     { "src": "/shopping", "dest": "/shopping.html" },
+    { "src": "/shopping-nissen", "dest": "/shopping.html?shop=nissen" },
+    { "src": "/shopping-zozo", "dest": "/shopping.html?shop=zozo" },
     { "src": "/nissen-shopping.html", "dest": "/shopping.html" },
     { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }

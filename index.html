@@ -282,8 +282,11 @@
       <div style="padding:20px; color:#aaa; font-size:13px;">載入中...</div>
     </div>
     <div class="drawer-section-label" style="margin-top:8px;">其他服務</div>
-    <a class="drawer-event-item" href="/shopping">
-      <span class="dei-name">📸 出過嘅商品</span>
+    <a class="drawer-event-item" href="/shopping-nissen">
+      <span class="dei-name">📸 NISSEN 出過嘅商品</span>
+    </a>
+    <a class="drawer-event-item" href="/shopping-zozo">
+      <span class="dei-name">📸 ZOZOTOWN 出過嘅商品</span>
     </a>
     <a class="drawer-event-item" href="#general" onclick="closeDrawer()">
       <span class="dei-name">🛍️ 通常商品代購</span>
@@ -351,6 +354,7 @@
           <div class="rec-grid" id="recGridHK"></div>
         </div>
 
+        <a href="/shopping-nissen" style="display:block;margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--hk);border-radius:8px;text-align:center;text-decoration:none;color:var(--hk);font-size:13px;font-weight:500;">📸 睇我哋出過嘅 NISSEN 商品 → 直接落單</a>
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="nissenSlotsHK"></div>
         <button onclick="addNissenSlot('hk')"
@@ -395,6 +399,7 @@
           <div class="rec-grid" id="recGridTW"></div>
         </div>
 
+        <a href="/shopping-nissen" style="display:block;margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--tw);border-radius:8px;text-align:center;text-decoration:none;color:var(--tw);font-size:13px;font-weight:500;">📸 睇我哋出過嘅 NISSEN 商品 → 直接落單</a>
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="nissenSlotsTW"></div>
         <button onclick="addNissenSlot('tw')"
@@ -431,6 +436,7 @@
         <strong>到港運費：</strong>HK$<span data-ship-hk>4.5</span>／50g，另加 $10-$13 本地運費
       </div>
       <div style="margin-top:14px;">
+        <a href="/shopping-zozo" style="display:block;margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--hk);border-radius:8px;text-align:center;text-decoration:none;color:var(--hk);font-size:13px;font-weight:500;">📸 睇我哋出過嘅 ZOZOTOWN 商品 → 直接落單</a>
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="zozoSlotsHK"></div>
         <button onclick="addNissenSlot('hk','zozo')"
@@ -454,6 +460,7 @@
         <strong>到台運費：</strong>NT$<span data-ship-tw>20</span>／50g，另加 NT$38 賣貨便國內運費
       </div>
       <div style="margin-top:14px;">
+        <a href="/shopping-zozo" style="display:block;margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--tw);border-radius:8px;text-align:center;text-decoration:none;color:var(--tw);font-size:13px;font-weight:500;">📸 睇我哋出過嘅 ZOZOTOWN 商品 → 直接落單</a>
         <div class="service-contact-label" style="margin-bottom:8px;">🔍 即時報價工具</div>
         <div id="zozoSlotsTW"></div>
         <button onclick="addNissenSlot('tw','zozo')"

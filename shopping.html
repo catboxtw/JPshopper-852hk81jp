@@ -133,8 +133,8 @@
 </div>
 
 <div class="wrap">
-  <h1>出過嘅商品</h1>
-  <p class="lede">
+  <h1 id="pageTitle">出過嘅商品</h1>
+  <p class="lede" id="pageLede">
     我哋 IG 出過 post 嘅商品，揀好尺碼款式就落到單。<br>
     <strong>冇貨嘅款式會變灰色，撳唔到。</strong>
   </p>
@@ -169,7 +169,22 @@ const SUPA_HEADERS = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY };
 
 // 匯率每次載入即時攞，所以顯示嘅價錢永遠係當下嗰個
 const CFG = { hk: 0.057, tw: 0.24 };
-let region = (new URLSearchParams(location.search).get('region') === 'tw') ? 'tw' : 'hk';
+const qs = new URLSearchParams(location.search);
+let region = (qs.get('region') === 'tw') ? 'tw' : 'hk';
+
+// 分店睇條商品網址嚟認，唔用「來源」欄 ——
+// 一個 post 混住兩間鋪嘅話，嗰欄會寫「NISSEN + ZOZOTOWN」，逐件貨就分唔到。
+const SHOPS = {
+  nissen: { label: 'NISSEN',   re: /nissen\.co\.jp/i,
+            blurb: '服飾同生活雜貨，平靚正。' },
+  zozo:   { label: 'ZOZOTOWN', re: /zozo\.jp/i,
+            blurb: '成千個日系品牌，日本人平時買咩你都買得到。' },
+  netsea: { label: '日本雜貨', re: /netsea\.jp/i,
+            blurb: '卡通公仔精品。' },
+};
+const shopOf = (it) => Object.keys(SHOPS).find(k => SHOPS[k].re.test(it.url || '')) || '';
+const onlyShop = SHOPS[qs.get('shop')] ? qs.get('shop') : '';
+
 let items = [], cart = [], cur = null;
 
 const $ = id => document.getElementById(id);
@@ -201,6 +216,14 @@ document.querySelectorAll('#regSeg button').forEach(b => {
 // ── 載入 ──
 (async () => {
   applyRegion();
+  if (onlyShop) {
+    const sh = SHOPS[onlyShop];
+    document.title = `${sh.label} — 852hk.81jp`;
+    $('pageTitle').textContent = sh.label;
+    $('pageLede').innerHTML =
+      `${esc(sh.blurb)}我哋 IG 出過 post 嘅商品，揀好尺碼款式就落到單。<br>` +
+      '<strong>冇貨嘅款式會變灰色，撳唔到。</strong>';
+  }
   loadCart();
   try {
     const r = await fetch(SUPA_URL + '/rest/v1/app_settings?select=key,value', { headers: SUPA_HEADERS });
@@ -215,8 +238,11 @@ document.querySelectorAll('#regSeg button').forEach(b => {
     const res = await fetch(GAS_API_URL + '?action=getShopItems');
     const d = JSON.parse(await res.text());
     items = (d.items || []).filter(i => i.card || i.photo);
+    if (onlyShop) items = items.filter(i => shopOf(i) === onlyShop);
     if (!items.length) {
-      $('msg').textContent = '仲未有商品，出咗 post 之後就會喺呢度出現。';
+      $('msg').textContent = onlyShop
+        ? `${SHOPS[onlyShop].label} 暫時未有商品，出咗 post 之後就會喺呢度出現。`
+        : '仲未有商品，出咗 post 之後就會喺呢度出現。';
       return;
     }
     $('msg').style.display = 'none';
@@ -232,7 +258,7 @@ function renderGrid() {
     <button class="it" type="button" data-n="${n}">
       <div class="im"><img src="${esc(it.card || it.photo)}" alt="${esc(it.name)}" loading="lazy"></div>
       <div class="bd">
-        ${it.source ? `<p class="src">${esc(it.source)}</p>` : ''}
+        ${!onlyShop && shopOf(it) ? `<p class="src">${esc(SHOPS[shopOf(it)].label)}</p>` : ''}
         <p class="nm">${esc(it.name)}</p>
         <p class="pr">${priceTxt(it)}</p>
       </div>
@@ -272,12 +298,29 @@ async function openItem(n) {
 
 function drawItem(warn) {
   const { it, picked, qty } = cur;
-  const groups = cur.live === null ? [] : cur.live;
-  const need = groups.filter(g => (g.options || []).length).length;
-  const done = groups.filter(g => picked[g.group] !== undefined).length;
+  // 資料入面一個 group ＝ 一隻顏色，佢啲 options ＝ 嗰隻色有嘅尺碼。
+  // 所以客人要揀嘅係「一隻色 ＋ 一個碼」，唔係每隻色都揀一個。
+  const colours = (cur.live === null ? [] : cur.live).filter(g => (g.options || []).length);
+  const hasStock = g => (g.options || []).some(o => o.inStock);
+
+  // 得一隻色就唔使揀，直接幫佢揀咗
+  if (colours.length === 1 && picked.colour === undefined && hasStock(colours[0])) {
+    picked.colour = colours[0].group;
+  }
+  const cg = colours.find(g => g.group === picked.colour) || null;
+  const sizes = cg ? (cg.options || []) : [];
+  // 嗰隻色得一個有貨嘅碼，都唔使揀
+  const inStockSizes = sizes.filter(o => o.inStock);
+  if (cg && picked.size === undefined && inStockSizes.length === 1) {
+    picked.size = inStockSizes[0].name;
+  }
+
+  const need = colours.length ? (sizes.length ? 2 : 1) : 0;
+  const done = (picked.colour !== undefined ? 1 : 0) +
+               (sizes.length && picked.size !== undefined ? 1 : 0);
+
   // 後台每日會自動落架，但客人可能啱啱撞正剛剛賣斷嗰個窗口，所以呢度再擋一次
-  const soldOut = cur.gone || (groups.length > 0 &&
-    !groups.some(g => (g.options || []).some(o => o.inStock)));
+  const soldOut = cur.gone || (colours.length > 0 && !colours.some(hasStock));
 
   $('itemBody').innerHTML = `
     <h2>${esc(it.name)}</h2>
@@ -289,19 +332,30 @@ function drawItem(warn) {
         : '已包代購費用'}<br>
       國際運費另計（只計實重，冇體積重）
     </p>
-    ${cur.live === null
-      ? '<p class="note">查緊款式…</p>'
-      : groups.map(g => `
+    ${cur.live === null ? '<p class="note">查緊款式…</p>' : `
+      ${colours.length > 1 ? `
         <div class="vgroup">
-          <h3>${esc(g.group || '款式')}</h3>
+          <h3>顏色</h3>
           <div class="opts">
-            ${(g.options || []).map(o => `
-              <button class="opt${picked[g.group] === o.name ? ' on' : ''}" type="button"
-                      data-g="${esc(g.group)}" data-o="${esc(o.name)}"
-                      ${o.inStock ? '' : 'disabled title="冇貨"'}>${esc(o.name || '—')}</button>
+            ${colours.map(g => `
+              <button class="opt${picked.colour === g.group ? ' on' : ''}" type="button"
+                      data-pick="colour" data-v="${esc(g.group)}"
+                      ${hasStock(g) ? '' : 'disabled title="呢隻色冇貨"'}>${esc(g.group || '—')}</button>
             `).join('')}
           </div>
-        </div>`).join('')}
+        </div>` : ''}
+      ${sizes.length ? `
+        <div class="vgroup">
+          <h3>尺碼${colours.length === 1 && colours[0].group ? `　<span style="font-weight:400;color:var(--muted)">（${esc(colours[0].group)}）</span>` : ''}</h3>
+          <div class="opts">
+            ${sizes.map(o => `
+              <button class="opt${picked.size === o.name ? ' on' : ''}" type="button"
+                      data-pick="size" data-v="${esc(o.name)}"
+                      ${o.inStock ? '' : 'disabled title="呢個碼冇貨"'}>${esc(o.name || '—')}</button>
+            `).join('')}
+          </div>
+        </div>` : (colours.length > 1 && !cg
+          ? '<p class="note">揀咗顏色就會顯示有咩碼。</p>' : '')}`}
     ${warn ? `<p class="warn">⚠️ ${esc(warn)}</p>` : ''}
     <div class="qtyRow">
       <label>數量</label>
@@ -322,7 +376,8 @@ function drawItem(warn) {
     <p class="note">揀好之後會入購物車，可以一次過落幾件。</p>`;
 
   document.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {
-    picked[b.dataset.g] = b.dataset.o;
+    picked[b.dataset.pick] = b.dataset.v;
+    if (b.dataset.pick === 'colour') delete picked.size;  // 換色 = 重新揀碼
     drawItem(warn);
   }));
   const q = $('qN');
@@ -334,7 +389,10 @@ function drawItem(warn) {
 
 function addToCart() {
   const { it, picked, qty } = cur;
-  const spec = Object.keys(picked).map(k => `${k}：${picked[k]}`).join('／');
+  const spec = [
+    picked.colour ? `顏色：${picked.colour}` : '',
+    picked.size   ? `尺碼：${picked.size}`   : '',
+  ].filter(Boolean).join('／');
   const key = it.url + '|' + spec;
   const hit = cart.find(c => c.key === key);
   if (hit) hit.qty += qty;
@@ -348,7 +406,7 @@ function addToCart() {
 }
 
 // ── 購物車 ──
-function cartKey() { return 'shopCart_' + region; }
+function cartKey() { return 'shopCart_' + region + (onlyShop ? '_' + onlyShop : ''); }
 function loadCart() {
   try { cart = JSON.parse(localStorage.getItem(cartKey()) || '[]'); } catch (e) { cart = []; }
   $('cartN').textContent = cart.reduce((a, c) => a + c.qty, 0);
