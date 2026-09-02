@@ -729,7 +729,15 @@ const picCache = new Map();
 async function loadPic(url) {
   if (picCache.has(url)) return picCache.get(url);
   const p = (async () => {
-    const res = await fetch(`${GAS_API_URL}?action=proxyImage&url=${encodeURIComponent(url)}`);
+    // 一定要有死線 —— GAS 攞唔到張相嗰陣係唔會出聲嘅，冇死線就成個「整緊卡…」
+    // 吊死喺度，睇落好似當咗機咁
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 40000);
+    let res;
+    try { res = await fetch(`${GAS_API_URL}?action=proxyImage&url=${encodeURIComponent(url)}`,
+                            { signal: ctrl.signal }); }
+    catch (e) { throw new Error(e.name === 'AbortError' ? '等咗 40 秒都攞唔到張相' : e.message); }
+    finally { clearTimeout(timer); }
     const d = JSON.parse(await res.text());
     if (!d.dataUri) throw new Error(d.message || d.error || '攞唔到商品相');
     return await new Promise((ok, no) => {
@@ -739,6 +747,8 @@ async function loadPic(url) {
       im.src = d.dataUri;
     });
   })();
+  // 失敗嗰個唔可以留喺 cache，唔係撳「再試一次」都係即刻彈返同一個錯
+  p.catch(() => picCache.delete(url));
   picCache.set(url, p);
   return p;
 }
@@ -801,7 +811,7 @@ function wrapText(ctx, text, maxW, maxLines) {
   return lines;
 }
 
-async function drawCard(item, seq) {
+async function drawCard(item, seq, note) {
   await loadCardFonts();
   const cv = document.createElement('canvas');
   cv.width = CARD_W; cv.height = CARD_H;
@@ -832,10 +842,16 @@ async function drawCard(item, seq) {
 
   // 商品相。揀咗幾張就砌拼圖：第一張大嗰邊，其餘細張排右邊直落。
   const BX = M, BY = 180, BW = 920, BH = 820, GAP = 16;
-  const pics = [];
-  for (const u of picsOf(item).slice(0, MAX_PICS)) {
-    try { pics.push(await loadPic(u)); } catch (e) { /* 呢張載唔到就跳過 */ }
-  }
+  // 幾張相一齊攞，唔好排隊等 —— 一張要行足十幾秒 GAS，四張排隊就成分鐘。
+  // 邊張攞唔到就跳過嗰張，唔會拖冧成張卡。
+  const wanted = picsOf(item).slice(0, MAX_PICS);
+  let done = 0;
+  if (note && wanted.length > 1) note(`攞緊 ${wanted.length} 張相…`);
+  const pics = (await Promise.all(wanted.map(u =>
+    loadPic(u).then(im => im, () => null).finally(() => {
+      if (note && wanted.length > 1) note(`攞緊相 ${++done} / ${wanted.length}…`);
+    })
+  ))).filter(Boolean);
   ctx.letterSpacing = '0px';
   if (!pics.length) {
     ctx.fillStyle = P.shot;
@@ -982,10 +998,12 @@ $('saveBtn').addEventListener('click', async () => {
     // 先整卡再存，唔係 Sheet 入面會留低日本網站嘅原相
     const cards = [];
     for (let k = 0; k < grp.length; k++) {
-      $('saveMsg').innerHTML =
-        `第 <b>${g + 1}</b> / ${groups.length} 個 post — 整緊第 ${k + 1} / ${grp.length} 張卡…`;
+      const step = (s) => { $('saveMsg').innerHTML =
+        `第 <b>${g + 1}</b> / ${groups.length} 個 post — 第 ${k + 1} / ${grp.length} 張卡 ${s}`; };
+      step('…');
       try {
-        const blob = await drawCard(grp[k], k + 1);
+        const blob = await drawCard(grp[k], k + 1, step);
+        step('上載緊…');
         cards.push(await uploadCard(blob, `post-${Date.now()}-${k + 1}.jpg`));
       } catch (e) {
         $('saveMsg').innerHTML =
