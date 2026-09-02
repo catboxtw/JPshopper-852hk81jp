@@ -252,7 +252,15 @@
     .cart-submit-btn:hover { opacity: 0.88; }
     .cart-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .cart-empty-hint { font-size: 12px; color: var(--muted); text-align: center; padding: 12px 0; }
+  /* ZOZOTOWN 暫時收埋。想開返：下面 <script> 嗰句 SHOW_ZOZO 改做 true 就得，
+     所有 ZOZO 嘅嘢（報價區、入口掣、側邊欄）都掛咗 data-zozo，唔使周圍搵。
+     預設收起，開嗰陣先加 class，咁就唔會閃一閃先至收埋。 */
+  html:not(.zozo-on) [data-zozo]{display:none !important}
   </style>
+  <script>
+    const SHOW_ZOZO = false;
+    if (SHOW_ZOZO) document.documentElement.classList.add('zozo-on');
+  </script>
 </head>
 <body>
 
@@ -285,7 +293,7 @@
     <a class="drawer-event-item" href="/shopping-nissen">
       <span class="dei-name">📸 NISSEN 出過嘅商品</span>
     </a>
-    <a class="drawer-event-item" href="/shopping-zozo">
+    <a class="drawer-event-item" href="/shopping-zozo" data-zozo>
       <span class="dei-name">📸 ZOZOTOWN 出過嘅商品</span>
     </a>
     <a class="drawer-event-item" href="#general" onclick="closeDrawer()">
@@ -423,7 +431,7 @@
   </div>
 
   <!-- HK: ZOZOTOWN -->
-  <div class="service-card general hk-only">
+  <div class="service-card general hk-only" data-zozo>
     <div class="service-card-inner">
       <ul class="service-points">
         <li>✨ ZOZOTOWN 日本長期代購</li>
@@ -447,7 +455,7 @@
   </div>
 
   <!-- TW: ZOZOTOWN -->
-  <div class="service-card general tw-only">
+  <div class="service-card general tw-only" data-zozo>
     <div class="service-card-inner">
       <ul class="service-points">
         <li>✓ ZOZOTOWN 日本長期代購</li>
@@ -1237,8 +1245,7 @@ loadData();
 loadRates();                      // 匯率（Nissen 同 ZOZOTOWN 共用）
 addNissenSlot('hk');
 addNissenSlot('tw');
-addNissenSlot('hk', 'zozo');
-addNissenSlot('tw', 'zozo');
+if (SHOW_ZOZO) { addNissenSlot('hk', 'zozo'); addNissenSlot('tw', 'zozo'); }
 loadNissenFeatured();
 loadNissenRecommended();
 loadCart('hk');
