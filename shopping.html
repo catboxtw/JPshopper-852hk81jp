@@ -183,7 +183,11 @@ const SHOPS = {
             blurb: '卡通公仔精品。' },
 };
 const shopOf = (it) => Object.keys(SHOPS).find(k => SHOPS[k].re.test(it.url || '')) || '';
-const onlyShop = SHOPS[qs.get('shop')] ? qs.get('shop') : '';
+// 分店要由條路徑度認返。vercel.json 嗰行 /shopping-nissen → /shopping.html?shop=nissen
+// 係 rewrite，瀏覽器條網址唔會變，所以 location.search 係空嘅 —— 淨係睇 ?shop=
+// 就會當成「全部商品」，三間鋪嘅貨一次過倒晒出嚟。
+const want = qs.get('shop') || (location.pathname.match(/shopping-([a-z]+)/i) || [])[1] || '';
+const onlyShop = SHOPS[want] ? want : '';
 
 let items = [], cart = [], cur = null;
 
@@ -371,8 +375,9 @@ function drawItem(warn) {
       ${cur.live === null ? '查緊…' : cur.gone ? '已落架' : soldOut ? '已售罄'
         : done < need ? `仲要揀 ${need - done} 樣` : '加入購物車'}
     </button>
-    <a class="ghost" style="display:block;text-align:center;text-decoration:none;"
-       href="${esc(it.url)}" target="_blank" rel="noopener">睇日本原頁 ↗</a>
+    ${shopOf(it) === 'netsea' ? '' : `
+      <a class="ghost" style="display:block;text-align:center;text-decoration:none;"
+         href="${esc(it.url)}" target="_blank" rel="noopener">睇日本原頁 ↗</a>`}
     <p class="note">揀好之後會入購物車，可以一次過落幾件。</p>`;
 
   document.querySelectorAll('.opt').forEach(b => b.addEventListener('click', () => {

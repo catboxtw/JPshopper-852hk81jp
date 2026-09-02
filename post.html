@@ -651,28 +651,28 @@ function buildCaption(list) {
     L.push('🚚 每兩星期由日本寄出，郵局易寄取運費只要HK$10-13！可以7仔/郵局/智郵站拎');
     L.push('');
     L.push('💬 想落單或者想問其他商品：');
-    L.push('　① DM 我哋，貼低商品網址，即刻同你計');
-    L.push('　② 上官網自己貼，秒出報價 — 連顏色尺碼、仲有冇貨都睇到');
+    L.push('　① DM我哋，send post或cap低圖片，我哋會盡快回覆!');
+    L.push('　② 官網有報價功能，可以check定仲有冇心水顏色 / 尺碼');
     L.push('');
     L.push('🔗 jpshopper-852hk81jp.vercel.app');
     L.push('');
     L.push(onSale.length
       ? `${best.discount ? `減 ${best.discount}% ` : ''}唔知幾時完，見到心水唔好等 — 斷咗碼真係冇㗎喇 🥲`
-      : '睇中直接落單，唔使等 ☺️');
+      : '睇中直接落單都得 ☺️');
   } else {
     L.push('⚖️ 國際運費只計實重，不算材積重 — 買衣服最划算');
     L.push(`📦 到台運費 NT$${CFG.shipTw}／50g，另加賣貨便國內運費 NT$38`);
     L.push('🚚 每月從日本寄出，到台後以賣貨便寄送');
     L.push('');
     L.push('💬 想下單或想問其他商品：');
-    L.push('　① 私訊我們，貼上商品連結，馬上幫你算');
-    L.push('　② 上官網自己貼，秒出報價 — 連顏色、尺寸、有沒有貨都看得到');
+    L.push('　① 私訊我們，傳貼文或截圖給我們，會盡快回覆你!');
+    L.push('　② 官網有報價功能，可以先確認想要的顏色 / 尺寸還有沒有貨');
     L.push('');
     L.push('🔗 jpshopper-852hk81jp.vercel.app');
     L.push('');
     L.push(onSale.length
       ? `${best.discount ? `${best.discount}% OFF ` : ''}不知道什麼時候結束，看到喜歡的別猶豫 — 斷碼就真的沒了 🥲`
-      : '看中直接下單，不用等回覆 ☺️');
+      : '看中直接下單也可以 ☺️');
   }
 
   return L.join('\n');
