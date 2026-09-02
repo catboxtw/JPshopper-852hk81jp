@@ -755,6 +755,24 @@ function fetchNissenProduct_(url) {
             || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
     if (imgM) result.image = imgM[1];
 
+    // 其他角度嘅相：同主相同一個資料夾、同一個商品編號開頭嗰啲。
+    // 唔敢掃成版所有 .jpg —— 咁會連介面圖示同橫額都掃埋入嚟。
+    if (result.image) {
+      var nImgs = [result.image], nSeen = {};
+      nSeen[result.image] = 1;
+      var cut  = result.image.lastIndexOf('/');
+      var stem = result.image.slice(0, cut + 1) + result.image.slice(cut + 1).split(/[_.]/)[0];
+      if (cut > 0 && stem.length > result.image.lastIndexOf('/') + 4) {
+        var reN = new RegExp(stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+                             '[^"\'\\s>]*\\.jpe?g', 'gi');
+        var mn;
+        while ((mn = reN.exec(html))) {
+          if (!nSeen[mn[0]]) { nSeen[mn[0]] = 1; nImgs.push(mn[0]); }
+        }
+      }
+      result.images = nImgs.slice(0, 8);
+    }
+
     // 2. 税込価格: var priceL = 最低価格, var price = 最高価格
     var pLM = html.match(/var\s+priceL\s*=\s*"(\d+)"/);
     var pMaxM = html.match(/var\s+price\s*=\s*"(\d+)"/);
@@ -830,6 +848,16 @@ function fetchZozoProduct_(url) {
           var g = fsr.goods;
           result.name  = (g.goodsName || '').trim();
           result.image = g.defaultImageUrl || null;
+
+          // 其他角度／其他顏色嘅相。__NEXT_DATA__ 入面啲欄位名改過幾次，
+          // 所以唔靠欄位名，直接喺段 JSON 度搵大版嘅相（_500.jpg）。
+          var zImgs = [], zSeen = {};
+          if (result.image) { zSeen[result.image] = 1; zImgs.push(result.image); }
+          var reZ = /"(https:\/\/[a-z0-9.\-]*imgz\.jp\/[^"]+_500\.jpg)"/gi, mz;
+          while ((mz = reZ.exec(m[1]))) {
+            if (!zSeen[mz[1]]) { zSeen[mz[1]] = 1; zImgs.push(mz[1]); }
+          }
+          result.images = zImgs.slice(0, 8);
 
           var pi = g.priceInfo || {};
           if (pi.price) result.price = parseInt(pi.price);          // 稅込售價
@@ -947,6 +975,39 @@ function detectCharacter_(text) {
   return null;
 }
 
+// 尺寸有兩個可能出處，而且係「商品紹介」嗰段先至靠得住：
+//   1. 商品紹介 段落，多數寫成「■サイズ：約100×90×30mm」
+//   2. 商品詳細 表格嘅「サイズ・容量」格
+// 表格嗰格好多賣家攞嚟擺自己嘅橫額同分類連結，所以一見有圖或者連結就當佢冇料到。
+function netseaSize_(html) {
+  // 只喺商品紹介嗰段搵，唔係成版搵 —— 版面第啲位（JS 註解、說明文）都有「サイズ」
+  var sec = html.match(/id=["']itemSummarySec["'][\s\S]*?<\/section>/i);
+  if (sec) {
+    var m = sec[0].match(/サイズ[^：:<]{0,6}[：:]\s*([^<]{1,60})/);
+    if (m) {
+      var s = m[1].replace(/&nbsp;/gi, ' ').replace(/\s+/g, ' ').trim();
+      if (s) return s;
+    }
+  }
+  var td = html.match(/サイズ・容量<\/th>[\s\S]{0,80}?<td[^>]*>([\s\S]{0,1500}?)<\/td>/);
+  if (td && !/<img|<a\s/i.test(td[1])) {
+    var txt = td[1].replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ')
+                   .replace(/\s+/g, ' ').trim();
+    if (txt && txt.length <= 60) return txt;
+  }
+  return '';
+}
+
+// 尺寸唔交去機翻 —— 譯壞咗個數字，客人就會照住錯嘅尺寸落單。
+// 淨係換走幾個常見日文詞，其餘照抄。
+function netseaSizeZh_(s) {
+  if (!s) return '';
+  return s.replace(/縦/g, '長').replace(/横|幅/g, '闊')
+          .replace(/高さ/g, '高').replace(/奥行き?/g, '深')
+          .replace(/重さ/g, '重').replace(/程度/g, '左右')
+          .replace(/サイズ/g, '尺寸').replace(/：/g, '：').trim();
+}
+
 // NETSEA 商品頁。出 post 只需要商品名、相、同埋「メーカー希望小売価格」——
 // 卸價唔會出街，所以呢度唔攞。
 function fetchNetseaProduct_(url) {
@@ -973,6 +1034,20 @@ function fetchNetseaProduct_(url) {
     if (ogT) result.name = decodeJsString_(ogT[1]);
     var ogI = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
     if (ogI) result.image = ogI[1];
+
+    // 主相之外仲有幾張，出 post 想砌拼圖就要齊料。
+    // 啲縮圖係 <img data-url="https://img03.netsea.jp/…" src="//ic02.netsea.jp/…">，
+    // src 嗰個係細版，data-url 先係原圖。
+    var imgs = [], seenImg = {};
+    if (result.image) { seenImg[result.image] = 1; imgs.push(result.image); }
+    var reImg = /data-url=["'](https?:\/\/img[0-9]*\.netsea\.jp\/[^"']+\.(?:jpe?g|png|gif))["']/gi, mi;
+    while ((mi = reImg.exec(html))) {
+      if (!seenImg[mi[1]]) { seenImg[mi[1]] = 1; imgs.push(mi[1]); }
+    }
+    result.images = imgs.slice(0, 8);
+    if (!result.image && imgs.length) result.image = imgs[0];
+
+    result.size = netseaSizeZh_(netseaSize_(html));
 
     // 上代（メーカー希望小売価格）寫成「3,500円/点（税抜）」，
     // 卸價寫成「2,415円（税抜）」—— 靠「円/点」分得出邊個係邊個。
