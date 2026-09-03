@@ -109,12 +109,45 @@ async function init() {
     if (cached) order = JSON.parse(cached);
   } catch(e) {}
 
-  // 再從 Supabase 讀取確認
+  // 再從 Supabase 讀取確認。唔再直接讀張表 —— 直接讀就等於任何人有單號
+  // 就攞到晒張單嘅資料。而家要對埋 email／電話。
+  // 啱落完單嗰部機喺 localStorage 有齊資料，所以正常情況下唔使問。
   try {
-    const res = await fetch(`${SUPA_URL}/rest/v1/nissen_orders?order_no=eq.${encodeURIComponent(orderNo)}&select=*`, { headers: SUPA_H });
-    const rows = await res.json();
-    if (rows && rows[0]) order = { ...order, ...rows[0] };
+    const contact = (order && (order.customer_email || order.customer_phone)) ||
+                    new URLSearchParams(location.search).get('c') || '';
+    if (contact) {
+      const res = await fetch(`${SUPA_URL}/rest/v1/rpc/get_nissen_order`, {
+        method: 'POST', headers: { ...SUPA_H, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_order_no: orderNo, p_contact: contact }),
+      });
+      const rows = await res.json();
+      if (rows && rows[0]) order = { ...order, ...rows[0] };
+    }
   } catch(e) {}
+
+  // 換咗部機／由 email 撳入嚟嘅話，localStorage 冇嘢，就問返佢
+  if (!order) {
+    document.getElementById('loadingWrap').style.display = 'none';
+    document.getElementById('pageContent').style.display = '';
+    document.getElementById('pageContent').innerHTML =
+      '<div style="max-width:340px;margin:0 auto;text-align:center;">' +
+      '<p style="margin-bottom:12px;">請輸入你落單時用嘅 Email 或電話，以確認身分。</p>' +
+      '<input id="payContact" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;" ' +
+      'placeholder="Email 或電話">' +
+      '<button id="payContactBtn" style="width:100%;margin-top:10px;padding:10px;border:none;' +
+      'border-radius:8px;background:#111;color:#fff;cursor:pointer;">確認</button>' +
+      '<p id="payContactMsg" style="color:#c62828;font-size:12px;margin-top:8px;min-height:16px;"></p></div>';
+    const go = () => {
+      const v = document.getElementById('payContact').value.trim();
+      if (!v) return;
+      const u = new URL(location.href);
+      u.searchParams.set('c', v);
+      location.href = u.toString();
+    };
+    document.getElementById('payContactBtn').addEventListener('click', go);
+    document.getElementById('payContact').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    return;
+  }
 
   document.getElementById('loadingWrap').style.display = 'none';
   document.getElementById('pageContent').style.display = '';

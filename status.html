@@ -68,9 +68,15 @@
       <input type="text" id="orderInput" placeholder="例：NK-20260701-AB3D" autocapitalize="characters">
       <button onclick="lookup()">查詢</button>
     </div>
+    <!-- 單號尾嗰四個字係隨機，但得四個字元 —— 撞得中，所以唔可以當佢係密碼。
+         代購單要再對埋落單時嘅 email 或者電話，先至睇到人哋張單。 -->
+    <div class="search-row" id="contactRow" style="margin-top:8px;">
+      <input type="text" id="contactInput" placeholder="落單時用嘅 Email 或電話">
+    </div>
     <div class="search-hint">
-      💡 Nissen 代購訂單號以 <strong>NK-</strong> 開頭（在付款頁及確認 Email 內）<br>
-      ⚡ 現貨搶購請輸入 8 位訂單參考編號
+      💡 Nissen 代購訂單號以 <strong>NK-</strong> 開頭（在付款頁及確認 Email 內），
+      查詢時要一併輸入落單時用嘅 Email 或電話<br>
+      ⚡ 現貨搶購請輸入 8 位訂單參考編號（唔使填 Email）
     </div>
   </div>
 
@@ -135,8 +141,22 @@ async function lookup(fromUrl) {
   }
 }
 
+function renderNeedContact(orderNo) {
+  resultEl.innerHTML = '<div class="card"><div class="err-box">' +
+    '查代購訂單 <strong>' + orderNo + '</strong> 要一併輸入你落單時用嘅 Email 或電話。<br>' +
+    '<span style="font-size:12px;">（為咗唔俾人淨係靠單號就睇到你嘅資料）</span></div></div>';
+  document.getElementById('contactInput').focus();
+}
+
 async function lookupNissen(orderNo) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/nissen_orders?order_no=eq.${encodeURIComponent(orderNo)}&select=*`, { headers: SUPA_H });
+  // 唔再直接讀張表 —— 直接讀就等於任何人有單號就睇到晒人哋啲資料。
+  // 呢個 function 會對埋 email／電話先至回一行。
+  const contact = document.getElementById('contactInput').value.trim();
+  if (!contact) { renderNeedContact(orderNo); return; }
+  const res = await fetch(`${SUPA_URL}/rest/v1/rpc/get_nissen_order`, {
+    method: 'POST', headers: { ...SUPA_H, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_order_no: orderNo, p_contact: contact }),
+  });
   const rows = await res.json();
   if (!rows || !rows[0]) { renderNotFound(orderNo); return; }
   const o = rows[0];
@@ -199,7 +219,10 @@ async function lookupFlash(ref) {
   // token 為 32 位 hex，參考編號 = 頭 8 位（大寫）
   const prefix = ref.toLowerCase().replace(/[^a-f0-9]/g, '');
   if (prefix.length < 6) { renderNotFound(ref); return; }
-  const res = await fetch(`${SUPA_URL}/rest/v1/flash_orders?token=ilike.${prefix}*&select=*&limit=1`, { headers: SUPA_H });
+  const res = await fetch(`${SUPA_URL}/rest/v1/rpc/get_flash_order`, {
+    method: 'POST', headers: { ...SUPA_H, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_ref: prefix }),
+  });
   const rows = await res.json();
   if (!rows || !rows[0]) { renderNotFound(ref); return; }
   const o = rows[0];

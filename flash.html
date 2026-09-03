@@ -325,12 +325,20 @@ async function handleSubmit(e) {
   }
 
   try {
-    const res = await fetch(`${SUPA_URL}/rest/v1/flash_orders?token=eq.${token}`, {
-      method: 'PATCH',
-      headers: { ...SUPA_H, 'Prefer': 'return=minimal' },
-      body: JSON.stringify(body)
+    // 唔再直接 PATCH 張表 —— 直接 PATCH 即係任何人都改到人哋張單。
+    // 呢個 function 要成條 token 先改到，而且改咗一次就唔再收。
+    const res = await fetch(`${SUPA_URL}/rest/v1/rpc/submit_flash_order`, {
+      method: 'POST',
+      headers: { ...SUPA_H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        p_token: token,          p_name:   body.customer_name,
+        p_phone: body.phone,     p_email:  body.email,
+        p_pay_method: body.pay_method, p_remark: body.remark,
+      })
     });
     if (!res.ok) throw new Error('submit failed');
+    const out = await res.json();
+    if (out && out.success === false) throw new Error(out.message || 'submit failed');
 
     // Update localStorage
     const claim = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
