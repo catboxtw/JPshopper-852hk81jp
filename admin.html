@@ -1422,15 +1422,42 @@
 
 <script>
 const CLOUDINARY_CLOUD  = 'db7sjoxid';
-const CLOUDINARY_KEY    = '474598516575124';
-const CLOUDINARY_SECRET = 'mh1dbws3zmjNdgpY2kq8lfbUQIg';
+// 以前呢度擺住 Cloudinary 個 api key 同簽名用嘅密碼，喺前端夾出個 signature ——
+// 即係任何人揭開呢版原始碼都簽到 request，連刪清成個圖庫都做得到。
+// 而家用 unsigned preset（post.html 一直都係咁做）：淨係上載得，刪唔到嘢。
+const CLOUDINARY_PRESET = 'jpshopper_post';
 
 const GAS = "https://script.google.com/macros/s/AKfycbzgsFv9_AjExH0VCh1m6DX18qTmXMKwO0xiBGQfYqvO2Q6nb5ZNeXRbsdRsbGVcFidIQw/exec";
 
 // ── Supabase Client (買貨區) ──
 const SUPA_URL = 'https://pksqfpirggvsftvqrtji.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrc3FmcGlyZ2d2c2Z0dnFydGppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MDE3MDQsImV4cCI6MjA5Nzk3NzcwNH0.TyGBeMNn91UCNEVhT-q4ivtgvXQL_GOLmdvtGMUIWuc';
-const SUPA_H = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' };
+// 個 key 唔再印喺原始碼度。入完密碼，GAS 驗完先派返嚟，
+// 所以佢只會存在你部機呢個分頁（sessionStorage，閂咗個分頁就冇）。
+// SUPA_H 係就住改內容、唔換過個 object —— 下面成百個地方引用緊佢。
+const SUPA_H = { 'apikey': '', 'Authorization': '', 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' };
+function setSupaKey(k) { SUPA_H.apikey = k; SUPA_H.Authorization = 'Bearer ' + k; }
+
+// ── 打 GAS 自動帶埋密碼 ──
+// 呢版有七十幾個地方打 GAS，逐個加 token 一定會漏，所以喺 fetch 度包一層。
+let ADMIN_TOKEN = '';
+const _fetch = window.fetch.bind(window);
+window.fetch = function (input, init) {
+  const url = (typeof input === 'string') ? input : (input && input.url) || '';
+  if (ADMIN_TOKEN && url.indexOf(GAS) === 0) {
+    if (init && init.method === 'POST' && typeof init.body === 'string') {
+      try {
+        const b = JSON.parse(init.body);
+        if (b && typeof b === 'object' && !Array.isArray(b)) {
+          b.token = ADMIN_TOKEN;
+          init = Object.assign({}, init, { body: JSON.stringify(b) });
+        }
+      } catch (e) { /* 唔係 JSON body 就唔郁佢 */ }
+    } else if (typeof input === 'string') {
+      input += (input.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(ADMIN_TOKEN);
+    }
+  }
+  return _fetch(input, init);
+};
 async function sbAdminGet(path) {
   const r = await fetch(`${SUPA_URL}/rest/v1/${path}`, { headers: SUPA_H });
   return r.ok ? r.json() : [];
@@ -1478,23 +1505,54 @@ function filterOrdersByEvent(eventName) {
 let filterHK = 'all', filterTW = 'all';
 
 // ── Lock ──
-function unlock() {
-  const pw = document.getElementById('pwInput').value;
-  if (pw === '4916') {
-    // 出 post 助手同一個閘，入咗一次唔使再入
-    try { sessionStorage.setItem('adminOk', '1'); } catch (e) {}
-    document.getElementById('lockScreen').style.display = 'none';
-    document.getElementById('adminApp').style.display = 'block';
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
-    init();
-  } else {
-    document.getElementById('pwInput').value = '';
-    document.getElementById('pwInput').placeholder = '密碼錯誤，請重試';
-    document.getElementById('pwInput').style.borderColor = '#ef4444';
-  }
+// 密碼交俾 GAS 驗，唔再喺呢度夾。以前係 pw === 一串寫死嘅數字，
+// 即係個密碼印晒喺原始碼度；而且就算改咗都冇用 —— 啲 API 本身冇閘，
+// 唔經呢個畫面直接打 GAS 一樣攞到晒啲客人資料。
+async function unlock() {
+  const el = document.getElementById('pwInput');
+  const pw = el.value.trim();
+  const fail = (msg) => { el.value = ''; el.placeholder = msg; el.style.borderColor = '#ef4444'; };
+  if (!pw) return fail('請輸入密碼');
+  el.disabled = true;
+  try {
+    const r = await _fetch(GAS + '?action=checkAdmin&pin=' + encodeURIComponent(pw));
+    const d = JSON.parse(await r.text());
+    if (d.result !== 'ok') {
+      return fail(d.error === 'admin_not_configured'
+        ? 'Apps Script 未設定 ADMIN_PIN' : '密碼錯誤，請重試');
+    }
+    openAdmin(pw, d.supaKey || '');
+  } catch (e) {
+    fail('連唔到伺服器，請再試');
+  } finally { el.disabled = false; }
 }
+
+function openAdmin(pin, supaKey) {
+  ADMIN_TOKEN = pin;
+  setSupaKey(supaKey);
+  // 出 post 助手同一個閘，入咗一次唔使再入
+  try {
+    sessionStorage.setItem('adminOk', '1');
+    sessionStorage.setItem('adminPin', pin);
+    sessionStorage.setItem('adminSupaKey', supaKey);
+  } catch (e) {}
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'block';
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  init();
+}
+
+// 同一個分頁入過就唔使再入
+(function () {
+  let pin = '', key = '';
+  try {
+    pin = sessionStorage.getItem('adminPin') || '';
+    key = sessionStorage.getItem('adminSupaKey') || '';
+  } catch (e) {}
+  if (pin) document.addEventListener('DOMContentLoaded', function () { openAdmin(pin, key); });
+})();
 document.getElementById('pwInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlock(); });
 
 // ── Init ──
@@ -3261,12 +3319,9 @@ function prodUploadPhoto() {
     var btn = document.getElementById('prodPhotoBtn');
     btn.innerText = '⏳ 上傳中...'; btn.disabled = true;
     try {
-      var timestamp = Math.round(Date.now() / 1000);
-      var sigStr = 'timestamp=' + timestamp + CLOUDINARY_SECRET;
-      var signature = await sha1(sigStr);
-      var fd = new FormData();
-      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
-      fd.append('timestamp', timestamp); fd.append('signature', signature);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
       var res  = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method:'POST', body:fd });
       var data = await res.json();
       if (data.secure_url) {
@@ -3967,15 +4022,9 @@ async function sfUploadImage(orderId) {
     btn.disabled = true;
 
     try {
-      const timestamp = Math.round(Date.now() / 1000);
-      const sigStr = `timestamp=${timestamp}${CLOUDINARY_SECRET}`;
-      const signature = await sha1(sigStr);
-
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('api_key', CLOUDINARY_KEY);
-      fd.append('timestamp', timestamp);
-      fd.append('signature', signature);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
 
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, {
         method: 'POST',
@@ -4388,13 +4437,9 @@ async function rfUploadPhoto(orderId, btn) {
     if (!file) return;
     btn.innerText = '⏳ 上傳中...'; btn.disabled = true;
     try {
-      const timestamp = Math.round(Date.now() / 1000);
-      const sigStr = `timestamp=${timestamp}${CLOUDINARY_SECRET}`;
-      const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(sigStr));
-      const sig = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
       const fd = new FormData();
-      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
-      fd.append('timestamp', timestamp); fd.append('signature', sig);
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
       const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method:'POST', body:fd });
       const data = await res.json();
       if (data.secure_url) {
@@ -5265,12 +5310,9 @@ function recUploadPhoto() {
     var btn = document.getElementById('recPhotoBtn');
     btn.innerText = '⏳ 上傳中…'; btn.disabled = true;
     try {
-      var timestamp = Math.round(Date.now() / 1000);
-      var sigStr = 'timestamp=' + timestamp + CLOUDINARY_SECRET;
-      var signature = await sha1(sigStr);
-      var fd = new FormData();
-      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
-      fd.append('timestamp', timestamp); fd.append('signature', signature);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
       var res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
       var data = await res.json();
       if (data.secure_url) {
@@ -5762,11 +5804,9 @@ function flashUploadPhoto() {
     var btn = document.getElementById('flashPhotoBtn');
     btn.innerText = '⏳ 上傳中…'; btn.disabled = true;
     try {
-      var timestamp = Math.round(Date.now() / 1000);
-      var signature = await sha1('timestamp=' + timestamp + CLOUDINARY_SECRET);
-      var fd = new FormData();
-      fd.append('file', file); fd.append('api_key', CLOUDINARY_KEY);
-      fd.append('timestamp', timestamp); fd.append('signature', signature);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_PRESET);
       var res = await fetch('https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD + '/image/upload', { method: 'POST', body: fd });
       var data = await res.json();
       if (data.secure_url) {

@@ -203,23 +203,45 @@
 </div>
 
 <script>
-// 同 admin 一樣嘅四位數。呢個係前端檢查，擋得住路過嘅人，
-// 擋唔住肯睇 source code 嘅人 —— 真正嘅保護要喺伺服器嗰邊做。
-const ADMIN_PIN = '4916';
+// 密碼唔再寫喺呢度夾 —— 以前寫死喺前端，擋得住路過嘅人，擋唔住睇 source 嘅人，
+// 而且啲 GAS action 本身冇閘，圍過個畫面一樣做到嘢。而家交俾 GAS 驗，
+// 驗完個密碼就當 token，之後每個 admin 請求都要帶住。
+let ADMIN_TOKEN = '';
 function openApp() {
   document.getElementById('lock').hidden = true;
   document.getElementById('app').hidden = false;
 }
-if (sessionStorage.getItem('adminOk') === '1') openApp();
-function tryPin() {
+try {
+  ADMIN_TOKEN = sessionStorage.getItem('adminPin') || '';
+} catch (e) {}
+if (ADMIN_TOKEN) openApp();
+
+async function tryPin() {
   const el = document.getElementById('pw');
-  if (el.value === ADMIN_PIN) {
-    try { sessionStorage.setItem('adminOk', '1'); } catch (e) {}
+  const msg = document.getElementById('pwMsg');
+  const pin = el.value.trim();
+  if (!pin) return;
+  el.disabled = true; msg.textContent = '檢查緊…';
+  try {
+    const r = await fetch(GAS_API_URL + '?action=checkAdmin&pin=' + encodeURIComponent(pin));
+    const d = JSON.parse(await r.text());
+    if (d.result !== 'ok') {
+      el.value = '';
+      msg.textContent = d.error === 'admin_not_configured'
+        ? 'Apps Script 未設定 ADMIN_PIN' : '密碼錯誤';
+      return;
+    }
+    ADMIN_TOKEN = pin;
+    try {
+      sessionStorage.setItem('adminOk', '1');
+      sessionStorage.setItem('adminPin', pin);
+      sessionStorage.setItem('adminSupaKey', d.supaKey || '');
+    } catch (e) {}
+    msg.textContent = '';
     openApp();
-  } else {
-    el.value = '';
-    document.getElementById('pwMsg').textContent = '密碼錯誤';
-  }
+  } catch (e) {
+    msg.textContent = '連唔到伺服器，請再試';
+  } finally { el.disabled = false; }
 }
 document.getElementById('pwBtn').addEventListener('click', tryPin);
 document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') tryPin(); });
@@ -1021,6 +1043,7 @@ $('saveBtn').addEventListener('click', async () => {
     $('saveMsg').innerHTML = `存緊第 <b>${g + 1}</b> / ${groups.length} 個 post…`;
     const payload = {
       action: 'savePostDraft',
+      token: ADMIN_TOKEN,
       region,
       shops: [...new Set(grp.map(i => SRC[i.key].label))].join(' + '),
       caption: buildCaption(grp),

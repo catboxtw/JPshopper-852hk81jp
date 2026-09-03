@@ -149,9 +149,77 @@ function isSystemSheet_(name) {
   return SYSTEM_SHEETS_.indexOf(name) !== -1;
 }
 
+
+// ============================================================
+// Admin 閘
+// ------------------------------------------------------------
+// 條 /exec 網址係公開嘅（每一版前台原始碼都有），所以「唔知條網址」
+// 唔算保護。以前呢度一個檢查都冇 —— 任何人 ?action=getAdminOrders
+// 就下載到成張訂單紀錄，連客人退款用嘅銀行帳號都有。
+//
+// 而家：客人真係要用嗰幾個 action 先公開，其餘一律要 token。
+// Token 存喺 Script Properties，唔可以寫入 code —— 寫咗就等於冇閘，
+// 因為 code.gs 會 push 上 GitHub。
+//
+//   Apps Script → ⚙️ 專案設定 → 指令碼屬性 → 新增
+//     ADMIN_PIN        你個後台密碼（admin.html／post.html 入嗰個）
+//     SUPA_SERVICE_KEY Supabase service_role key（後台繞過 RLS 用）
+// ============================================================
+
+// 客人嘅瀏覽器會 call 呢啲，所以要公開。加新 action 之前諗清楚：
+// 呢個 action 會唔會攞到／改到唔屬於呼叫者嘅嘢？會就唔好放呢度。
+var PUBLIC_ACTIONS_ = [
+  'getSheets', 'getMenuList', 'getProducts', 'getDeadlines',   // 前台商品清單
+  'getOrderSummary', 'getPurchasedQty',                        // 剩餘數量
+  'getNissenProduct', 'getZozoProduct', 'getNetseaProduct',    // 即時報價
+  'getNissenFeatured', 'getShopItems', 'proxyImage',           // 選購頁
+  'nissenOrderNotify', 'flashOrderNotify'                      // 落單通知（只入唔出）
+];
+
+function adminPin_() {
+  return PropertiesService.getScriptProperties().getProperty('ADMIN_PIN') || '';
+}
+
+// 回 null ＝ 放行；回一個 response ＝ 擋咗，要即刻 return 出去
+function denyIfNotAdmin_(action, param) {
+  if (!action) return null;                                   // 冇 action 嘅照舊跌落預設分流
+  if (PUBLIC_ACTIONS_.indexOf(action) !== -1) return null;
+
+  var pin = adminPin_();
+  if (!pin) {
+    // 未設定就唔好靜靜咁放行 —— 咁會等於冇裝過呢個閘
+    return jsonpOrJson_(param || {}, { result: 'error', error: 'admin_not_configured',
+      message: 'Apps Script 未設定 ADMIN_PIN（專案設定 → 指令碼屬性）' });
+  }
+  if (String((param && param.token) || '') === pin) return null;
+
+  return jsonpOrJson_(param || {}, { result: 'error', error: 'unauthorized',
+    message: '呢個操作要後台密碼' });
+}
+
 function doGet(e) {
   var param = (e && e.parameter) ? e.parameter : {};
   var action = param.action;
+
+  // 後台入密碼嗰陣行呢個。啱嘅話順手俾埋 Supabase service key，
+  // 咁後台就唔使好似以前咁將 key 印喺 admin.html 度俾全世界睇。
+  if (action === 'checkAdmin') {
+    var pin = adminPin_();
+    if (!pin) return jsonpOrJson_(param, { result: 'error', error: 'admin_not_configured',
+      message: 'Apps Script 未設定 ADMIN_PIN（專案設定 → 指令碼屬性）' });
+    if (String(param.pin || '') !== pin) {
+      Utilities.sleep(1000);                     // 拖慢啲，唔好俾人一秒鐘試一萬個
+      return jsonpOrJson_(param, { result: 'error', error: 'bad_pin', message: '密碼錯誤' });
+    }
+    return jsonpOrJson_(param, {
+      result: 'ok',
+      supaKey: PropertiesService.getScriptProperties().getProperty('SUPA_SERVICE_KEY') || ''
+    });
+  }
+
+  var denied = denyIfNotAdmin_(action, param);
+  if (denied) return denied;
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   if (action === "syncEventToSupabase") {
@@ -1297,6 +1365,21 @@ function doPost(e) {
     lock.waitLock(30000);
     
     var rowData = JSON.parse(e.postData.contents);
+
+    // 同 doGet 一樣要擋。冇 action 嗰啲係客人落單（shop-hk／shop-tw 送上嚟），
+    // 一定要照放行，唔係落唔到單。
+    if (rowData.action && PUBLIC_ACTIONS_.indexOf(rowData.action) === -1) {
+      var pin_ = adminPin_();
+      if (!pin_ || String(rowData.token || '') !== pin_) {
+        return ContentService.createTextOutput(JSON.stringify({
+          result: 'error',
+          error: pin_ ? 'unauthorized' : 'admin_not_configured',
+          message: pin_ ? '呢個操作要後台密碼'
+                        : 'Apps Script 未設定 ADMIN_PIN（專案設定 → 指令碼屬性）'
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
     // ── 功能 1：更新已收款狀態 ──────────────────────────────────────
