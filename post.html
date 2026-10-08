@@ -278,8 +278,9 @@ const SRC = {
 };
 const isNetsea = (it) => it && it.key === 'netsea';
 
-// 一大三細 —— 再多細相就細到睇唔清件貨
-const MAX_PICS = 4;
+// 一大、其餘細張排右邊。最多 10 張 —— 夠晒 NISSEN／ZOZOTOWN／批發網
+// 商品頁通常有嘅相，再多都好難逐張望清楚。
+const MAX_PICS = 10;
 // 揀咗嘅相，順序就係撳嘅順序，第一張擺左邊大格
 const picsOf = (it) => (it.pickImgs || []).map(i => (it.images || [])[i]).filter(Boolean);
 const mainPic = (it) => picsOf(it)[0] || it.image || '';
@@ -883,15 +884,24 @@ async function drawCard(item, seq, note) {
   } else if (pics.length === 1) {
     drawFit(ctx, pics[0], BX, BY, BW, BH, P.rule);
   } else {
-    // 細相盡量排到成柱同大相一樣高，唔好留大截空白；
-    // 但都要封頂，唔係得一張細相就會大到同主相爭位。
-    const n = pics.length - 1;
-    const side = Math.min(260, (BH - (n - 1) * GAP) / n);
-    drawFit(ctx, pics[0], BX, BY, BW - side - GAP, BH, P.rule);
-    let ty = BY + (BH - (side * n + GAP * (n - 1))) / 2;
+    // 細相排成格陣，唔再淨係排一條直柱 —— 揀到七、八張嘅話，
+    // 一條柱會逼到每張得十零廿 px 高，睇都睇唔清。
+    // 1-3 張細相：一欄直落（同以前一樣，大相照舊夠突出）
+    // 4-6 張：兩欄
+    // 7-9 張：三欄
+    // 欄愈多，每格封頂愈細，等大相唔會俾堆細相搶晒位。
+    const m = pics.length - 1;
+    const cols = m <= 3 ? 1 : m <= 6 ? 2 : 3;
+    const cap  = cols === 1 ? 260 : cols === 2 ? 180 : 140;
+    const rows = Math.ceil(m / cols);
+    const cell = Math.min(cap, (BH - (rows - 1) * GAP) / rows);
+    const SW = cell * cols + (cols - 1) * GAP;
+    drawFit(ctx, pics[0], BX, BY, BW - SW - GAP, BH, P.rule);
+    const gx = BX + BW - SW;
+    const gy = BY + (BH - (cell * rows + (rows - 1) * GAP)) / 2;
     for (let k = 1; k < pics.length; k++) {
-      drawFit(ctx, pics[k], BX + BW - side, ty, side, side, P.rule);
-      ty += side + GAP;
+      const i = k - 1, c = i % cols, r = Math.floor(i / cols);
+      drawFit(ctx, pics[k], gx + c * (cell + GAP), gy + r * (cell + GAP), cell, cell, P.rule);
     }
   }
 

@@ -838,7 +838,7 @@ function fetchNissenProduct_(url) {
           if (!nSeen[mn[0]]) { nSeen[mn[0]] = 1; nImgs.push(mn[0]); }
         }
       }
-      result.images = nImgs.slice(0, 8);
+      result.images = nImgs.slice(0, 10);
     }
 
     // 2. 税込価格: var priceL = 最低価格, var price = 最高価格
@@ -925,7 +925,7 @@ function fetchZozoProduct_(url) {
           while ((mz = reZ.exec(m[1]))) {
             if (!zSeen[mz[1]]) { zSeen[mz[1]] = 1; zImgs.push(mz[1]); }
           }
-          result.images = zImgs.slice(0, 8);
+          result.images = zImgs.slice(0, 10);
 
           var pi = g.priceInfo || {};
           if (pi.price) result.price = parseInt(pi.price);          // 稅込售價
@@ -1112,7 +1112,7 @@ function fetchNetseaProduct_(url) {
     while ((mi = reImg.exec(html))) {
       if (!seenImg[mi[1]]) { seenImg[mi[1]] = 1; imgs.push(mi[1]); }
     }
-    result.images = imgs.slice(0, 8);
+    result.images = imgs.slice(0, 10);
     if (!result.image && imgs.length) result.image = imgs[0];
 
     result.size = netseaSizeZh_(netseaSize_(html));
